@@ -1,0 +1,5 @@
+env*
+.vscode*
+mess*
+cached_images*
+*__pycache__*
