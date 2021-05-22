@@ -1,5 +1,6 @@
 env*
 .vscode*
 mess*
-cached_images*
 *__pycache__*
+static/cache/*
+.DS_Store
