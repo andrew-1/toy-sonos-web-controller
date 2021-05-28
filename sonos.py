@@ -2,13 +2,15 @@ import asyncio
 from collections import defaultdict
 import functools
 import os
-from typing import List, Dict, Set, DefaultDict
+from typing import List, Dict, Set, DefaultDict, ValuesView
 import string
 from aiohttp import web
 
 import soco
 from soco import events_asyncio
+from soco.core import SoCo
 
+from pprint import pprint
 
 class Song:
     def __init__(self, title, queue_position, track_number) -> None:
@@ -48,7 +50,7 @@ class SonosController:
     """simple wrapper for soco library"""
 
     def __init__(self, device) -> None:
-        self.device = device    
+        self.device: SoCo = device
         self.name = device.player_name
 
     def _make_an_album(self, song):
@@ -57,7 +59,9 @@ class SonosController:
     def albums(self) -> List[Album]:
         albums = []
         song_number = defaultdict(int)
-        for q_position, sonos_song in enumerate(self.device.get_queue(full_album_art_uri=True)):
+        for q_position, sonos_song in enumerate(self.device.get_queue(
+            full_album_art_uri=True, max_items=9999999
+        )):
             album = self._make_an_album(sonos_song)
             if not albums or not albums[-1] == album:
                 albums.append(album)
@@ -78,6 +82,25 @@ class SonosController:
     def play_from_queue(self, index: int):
         self.device.play_from_queue(index)
 
+    def play_next(self):
+        self.device.next()
+
+    def play_previous(self):
+        self.device.previous()
+
+    def play(self):
+        self.device.play()
+
+    def pause(self):
+        self.device.pause()
+
+    async def send_current_state(self, websocket):
+        await send_current_state(
+            websocket, 
+            int(self.device.get_current_track_info()["playlist_position"]) - 1,
+            self.device.get_current_transport_info()["current_transport_state"],
+        )
+
     @property
     def playlist_position(self) -> int:
         return self.device.get_current_track_info()['playlist_position']
@@ -90,34 +113,45 @@ def create_sonos_controllers() -> Dict[str, SonosController]:
     }
 
 
-async def _send_json(websocket: web.WebSocketResponse, event):
+async def send_current_state(
+    websocket: web.WebSocketResponse, 
+    current_track: int, 
+    state: str
+):
     try:
         await websocket.send_json(
             {
                 'action': 'current_track',
-                'track': int(event.variables['current_track']) - 1,
-                'state': event.variables['transport_state'],
+                'track': current_track,
+                'state': state,
             }
         )
     except ConnectionResetError:
         pass
 
-def callback(websockets, event):
-    for websocket in list(websockets):
-        asyncio.create_task(_send_json(websocket, event))
+def callback(websockets, controller, event):
+
+    for websocket in websockets.copy():
+        asyncio.create_task(
+            send_current_state(
+                websocket, 
+                int(event.variables['current_track']) - 1, 
+                event.variables['transport_state'],
+            )
+        )
 
 
 async def setup_subscriptions(
-    devices: List[soco.SoCo], 
+    controllers: ValuesView[soco.SoCo], 
     websockets: DefaultDict[str, Set[web.WebSocketResponse]]
 ) -> Dict[str, events_asyncio.Subscription]:
 
     subscriptions = {}
-    for device in devices:
-        subscription = await device.avTransport.subscribe()
+    for controller in controllers:
+        subscription = await controller.device.avTransport.subscribe()
         subscription.callback = functools.partial(
-            callback, websockets[device.player_name]
+            callback, websockets[controller.device.player_name], controller
         )
-        subscriptions[device.player_name] = subscription
+        subscriptions[controller.device.player_name] = subscription
 
     return subscriptions

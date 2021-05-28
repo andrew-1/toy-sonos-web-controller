@@ -1,7 +1,6 @@
 import asyncio
 from collections import defaultdict
-import logging
-from aiohttp.web_ws import WebSocketReady
+import re
 
 import jinja2
 import aiohttp_jinja2
@@ -21,14 +20,25 @@ async def init_app():
     app['websockets'] = defaultdict(set) 
     app['controllers'] = sonos.create_sonos_controllers()
     app['subscriptions'] = await sonos.setup_subscriptions(
-        [controller.device for controller in app['controllers'].values()],
+        app['controllers'].values(),
         app['websockets']
     )
     app['client_session'] = ClientSession()
-    app.on_shutdown.append(shutdown)
     
-    app.router.add_get('/', index)
+    alpha_numeric_path = lambda s: "/" + re.sub(r'\W+', '', s)
+    alpha_numeric_path_lower = lambda s: alpha_numeric_path(s).lower()
+
     app.add_routes([web.static('/static', './static')])
+
+    app['controller_paths'] = {
+        a_n_p(name): name
+        for name in app['controllers']
+        for a_n_p in (alpha_numeric_path, alpha_numeric_path_lower)
+    }
+    for path in app['controller_paths']:
+        app.router.add_get(path, index)
+
+    app.on_shutdown.append(shutdown)
 
     aiohttp_jinja2.setup(
         app, loader=jinja2.FileSystemLoader('./templates')
@@ -49,8 +59,6 @@ async def shutdown(app):
 
 
 def main():
-    # logging.basicConfig(level=logging.INFO)
-
     app = init_app()
     web.run_app(app)
 

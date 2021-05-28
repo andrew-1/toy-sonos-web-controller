@@ -1,6 +1,6 @@
 import asyncio
 from collections import Counter
-import logging
+import json
 import os
 
 import aiohttp_jinja2
@@ -9,8 +9,6 @@ from aiohttp import web
 from PIL import Image
 
 from sonos import SonosController
-
-log = logging.getLogger(__name__)
 
 
 def _get_background_image(file_name):
@@ -24,7 +22,6 @@ def _get_background_image(file_name):
         return tuple(10 * v for v in Counter(pixels).most_common(1)[0][0])
 
 async def _cache_art(album, session) -> bool:
-    print(album.art_uri)
     if os.path.isfile(album.cached_art_file_name):
         return False
 
@@ -50,9 +47,7 @@ async def cache_art_and_send_update(albums, websockets, session):
         if not await _cache_art(album, session):
             continue
 
-        websockets_copy = list(websockets)
-        print(websockets_copy)
-        for websocket in websockets_copy:
+        for websocket in websockets.copy():
             try:
                 await websocket.send_json(
                     {
@@ -65,47 +60,67 @@ async def cache_art_and_send_update(albums, websockets, session):
                 # something happened to the websocket whilst iterating
                 pass
 
-
-async def index(request):
-    ws_current = web.WebSocketResponse()
-    ws_ready = ws_current.can_prepare(request)
-
-    controller_name = "Living Room"
-    # controller_name = "Bedroom"
-    controller: SonosController = request.app['controllers'][controller_name]
-
-    albums = controller.albums()
-
-    if not ws_ready.ok:
-        return aiohttp_jinja2.render_template(
-            'index.html', 
-            request, 
-            {
-                "albums":albums, 
-                "playlist_position": int(controller.playlist_position) - 1
-            }
-        )
-
-    await ws_current.prepare(request)
-    
+async def download_art(albums, websockets, client_session):
     # art downloads quite slowly so this downloads the art then
     # sends a message all active sessions to reload art when available
     asyncio.create_task(
-        cache_art_and_send_update(
-            albums, 
-            request.app['websockets'][controller_name], 
-            request.app['client_session'],
-        )
+        cache_art_and_send_update(albums, websockets, client_session)
     )
-    request.app['websockets'][controller_name].add(ws_current)
 
-    async for msg in ws_current:
+
+def get_sonos_controller(app, path: str) -> SonosController:
+    paths = app['controller_paths']
+    controller_name = paths.get(path.lower(), "Living Room")
+    return app['controllers'][controller_name]
+
+
+def render_html(request, albums, controller):
+    return aiohttp_jinja2.render_template(
+        'index.html', 
+        request, 
+        {
+            "albums": albums, 
+            "playlist_position": int(controller.playlist_position) - 1
+        }
+    )
+
+
+async def parse_command(message: str, controller: SonosController):
+    message = json.loads(message)
+    
+    commands = {
+        "play_index": controller.play_from_queue,
+        "play_previous": controller.play_previous,
+        "play_next": controller.play_next,
+        "play": controller.play,
+        "pause": controller.pause,
+    }
+    do_nothing = lambda: None
+    command = commands.get(message["command"], do_nothing)
+    command(*message["args"])
+
+
+async def index(request):
+
+    controller = get_sonos_controller(request.app, request.path)
+    albums = controller.albums()
+
+    websocket = web.WebSocketResponse()
+    if not websocket.can_prepare(request).ok:
+        return render_html(request, albums, controller)
+
+    await websocket.prepare(request)
+    websockets = request.app['websockets'][controller.name]
+    websockets.add(websocket)
+
+    await download_art(albums, websockets, request.app['client_session'])
+    await controller.send_current_state(websocket)
+    async for msg in websocket:
         print(msg)
         if msg.type != aiohttp.WSMsgType.text:
             break
-        
-        controller.play_from_queue(int(msg.data))
+        await parse_command(msg.data, controller)
 
-    request.app['websockets'][controller_name].remove(ws_current)
+    websockets.remove(websocket)
 
-    return ws_current
+    return websocket

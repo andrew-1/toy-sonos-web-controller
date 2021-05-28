@@ -4,20 +4,15 @@
     <meta charset="UTF-8">
     <link rel="stylesheet" href="static/index.css">
     <title>Sonos controller</title>
-    <style>
-    {% for album in albums %}
-        #album{{ loop.index }} > button {
-            background-color:{{ album.back_ground_colour}};
-        }
-    {% endfor %}
-    </style>
+    <script src="static/index.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Icons"
+    rel="stylesheet">
 </head>
 <body>
     <hr></hr>
     {% for album in albums %}
-    <div class="grid-container" id="album{{loop.index}}">
         <div class="picture numbers">
-            <img 
+            <img
                 src="{{album.cached_art_file_name}}"
                 onerror="this.src='/static/loading.gif'"
                 id="{{album.cached_art_file_name}}_id"
@@ -25,68 +20,23 @@
         </div>
 
         {% for song in album.songs %}
-        <button 
+        <button
             class="button"
             id={{song.queue_position}}
-            onclick="playIndex({{ song.queue_position }})"
+            onclick="sendCommand('play_index', [{{ song.queue_position }}]);"; 
         >
-            <p class="emoji">{{ song.emoji }}</p>
-            <p class="title">{{ song.title }}</p>
+            {{ song.title }}
         </button>
         {% endfor %}
 
-    </div>
     <hr></hr>
     {% endfor %}
 
-
-<script>
-'use strict'
-let wsUri = (window.location.protocol=='https:'&&'wss://'||'ws://')+window.location.host;
-let ws = new WebSocket(wsUri);
-let current_index = {{ playlist_position }};
-// let current_background_colour = null
-updateDisplayedPlayingTrack(current_index)
-
-function playIndex(index) {
-    ws.send(index.toString());
-    console.log(index);
-}
-
-function loadImage(json) {
-    let img = document.getElementById(json.src+"_id");
-    img.src = json.src;
-}
-
-function updateDisplayedPlayingTrack(track) {
-
-    let button = document.getElementById(current_index);
-    button.style.backgroundColor = "";
-    
-    button = document.getElementById(track);
-    button.style="background-color:red;";
-    current_index = track;
-}
-
-function updatePlayingTrack(json) {
-    if (!(json.state == "PLAYING" || json.state == "TRANSITIONING")) {
-        return
-    }
-    updateDisplayedPlayingTrack(json.track)
-}
-
-ws.onmessage = function (event) {
-    let json = JSON.parse(event.data);
-    console.log(json);
-
-    if (json.action == "load_image") {
-        loadImage(json);
-    } else if (json.action == "current_track") {
-        updatePlayingTrack(json);
-    }
-};
-
-</script>
+    <div class='footer'>
+        <i class="material-icons" onclick="sendCommand('play_previous')">skip_previous</i>
+        <i class="material-icons" id="play_pause_icon" onclick="sendCommand('play')">play_arrow</i>
+        <i class="material-icons" onclick="sendCommand('play_next')">skip_next</i>
+    </div>
 </body>
 </html>
 
