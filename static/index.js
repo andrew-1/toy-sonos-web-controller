@@ -26,17 +26,19 @@ function loadImage(json) {
     }
 }
 
-function updateDisplayedPlayingTrack(track) {
-    let button
+function updateDisplayedPlayingTrack(index) {
+    let div
     if (!(current_index == null)) {
-        button = document.getElementById(current_index);
-        button.style.backgroundColor = "";
+        if (current_index == index) return;
+
+        div = document.getElementById(current_index);
+        div.style.backgroundColor = "";
     }
     
-    button = document.getElementById(track);
-    button.scrollIntoView({behavior: "smooth", block: "nearest", inline: "nearest"});
-    button.style="background-color:rgb(240,240,240);";
-    current_index = track;
+    div = document.getElementById(index);
+    div.scrollIntoView({behavior: "smooth", block: "nearest", inline: "nearest"});
+    div.style="background-color:rgb(240,240,240);";
+    current_index = index;
 }
 
 function updatePlayPauseIcon(state) {
