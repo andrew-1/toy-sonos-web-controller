@@ -1,8 +1,6 @@
 'use strict'
 
 let wsUri = (window.location.protocol=='https:'&&'wss://'||'ws://')+window.location.host+window.location.pathname;
-console.log(wsUri)
-console.log(window.location.pathname)
 let ws = new WebSocket(wsUri);
 let current_index = null;
 
@@ -14,9 +12,18 @@ function sendCommand(command, args=[]) {
     return ws.send(JSON.stringify(message))
 }
 
+function playIndex(index) {
+    sendCommand("play_index", [index])
+    updateDisplayedPlayingTrack(index)
+}
+
 function loadImage(json) {
-    let img = document.getElementById(json.src+"_id");
-    img.src = json.src;
+    let imgs = document.querySelectorAll(".art");
+    for (let img of imgs) {
+        if (img.dataset.arturi == json.src) {
+            img.src = json.src
+        };
+    }
 }
 
 function updateDisplayedPlayingTrack(track) {
@@ -28,7 +35,7 @@ function updateDisplayedPlayingTrack(track) {
     
     button = document.getElementById(track);
     button.scrollIntoView({behavior: "smooth", block: "nearest", inline: "nearest"});
-    button.style="background-color:red;";
+    button.style="background-color:rgb(240,240,240);";
     current_index = track;
 }
 
@@ -44,26 +51,22 @@ function updatePlayPauseIcon(state) {
 }
 
 function updatePlayingTrack(json) {
-    
     if (json.state == "PLAYING" || json.state == "PAUSED_PLAYBACK") {
         updatePlayPauseIcon(json.state);
     }
-    
-    if (!(json.state == "PLAYING" || json.state == "TRANSITIONING")) {
-        return
+    if ((json.state == "PLAYING" || json.state == "TRANSITIONING")) {
+        updateDisplayedPlayingTrack(json.track);
     }
-    updateDisplayedPlayingTrack(json.track);
 }
-
 
 ws.onmessage = function (event) {
     let json = JSON.parse(event.data);
-    console.log(json);
 
     if (json.action == "load_image") {
         loadImage(json);
     } else if (json.action == "current_track") {
         updatePlayingTrack(json);
+    } else if (json.action == "reload") {
+        location.reload();
     }
 };
-

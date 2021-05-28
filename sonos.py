@@ -1,83 +1,61 @@
-import asyncio
-from collections import defaultdict
-import functools
-import os
-from typing import List, Dict, Set, DefaultDict, ValuesView
+"""Clases to wrap soco libray features required for project"""
+
+from typing import List, Dict, Tuple, NamedTuple
 import string
-from aiohttp import web
 
 import soco
-from soco import events_asyncio
 from soco.core import SoCo
 
-from pprint import pprint
 
-class Song:
-    def __init__(self, title, queue_position, track_number) -> None:
-        self.title = title
-        self.queue_position = queue_position
-        self.track_number = track_number
-
-
-class Album:
-    def __init__(self, title: str, artist: str, art_uri: str, songs=None) -> None:
-        self.title: str = title
-        self.artist: str = artist
-        self.art_uri: str = art_uri
-        self.songs: List[str] = [] if songs is None else songs
-    
-    @property
-    def back_ground_colour(self):
-        if os.path.isfile(self.cached_art_file_name):
-            with open(self.cached_art_file_name + ".background", "r") as f:
-                return f"rgb{f.readline()}"
-        return "black"
+class QueueItem(NamedTuple):
+    """Container for an item in the queue"""
+    title: str
+    album: str
+    artist: str
+    sonos_art_uri: str
+    position: int
 
     @property
-    def cached_art_file_name(self):
+    def server_art_uri(self):
         ascii_lower_case = set(c for c in string.ascii_letters)
         a_z_only = lambda s: "".join(c for c in s if c in ascii_lower_case)
-        return f"static/cache/{a_z_only(self.artist)}___{a_z_only(self.title)}.png"
-
-    def __eq__(self, o: object) -> bool:
-        return self.title == o.title and self.artist == o.artist
-
-    def __hash__(self):
-        return hash((self.title, self.artist))
+        return f"static/cache/{a_z_only(self.artist)}___{a_z_only(self.album)}.png"
 
 
 class SonosController:
-    """simple wrapper for soco library"""
+    """Wrapper for soco library functionality"""
 
     def __init__(self, device) -> None:
         self.device: SoCo = device
-        self.name = device.player_name
+        self.name: str = device.player_name
+        self._queue_history = (None, None)
 
-    def _make_an_album(self, song):
-        return Album(song.album, song.creator, song.album_art_uri)
+    def _get_device_queue(self):
+        return self.device.get_queue(
+            full_album_art_uri=True, 
+            max_items=9999999
+        )
 
-    def albums(self) -> List[Album]:
-        albums = []
-        song_number = defaultdict(int)
-        for q_position, sonos_song in enumerate(self.device.get_queue(
-            full_album_art_uri=True, max_items=9999999
-        )):
-            album = self._make_an_album(sonos_song)
-            if not albums or not albums[-1] == album:
-                albums.append(album)
-            else:
-                album = albums[-1]
-
-            song_number[album] += 1
-            album.songs.append(
-                Song(
-                    sonos_song.title, 
-                    q_position, 
-                    song_number[album], 
-                )
+    def get_queue(self) -> List[QueueItem]:
+        queue = [
+            QueueItem(
+                song.title, song.album, song.creator, song.album_art_uri, i
             )
+            for i, song in enumerate(self._get_device_queue())
+        ]
+        self._queue_history = self._queue_history[-1], queue
+        return queue
+    
+    def load_playlist(self, name):
+        for p in self.device.get_sonos_playlists():
+            if p.title.lower() == name:
+                self.device.clear_queue()
+                self.device.add_to_queue(p)
+                return
 
-        return albums
+    def has_queue_changed(self) -> bool:
+        _ = self.get_queue()
+        return self._queue_history[0] != self._queue_history[1]
 
     def play_from_queue(self, index: int):
         self.device.play_from_queue(index)
@@ -94,16 +72,11 @@ class SonosController:
     def pause(self):
         self.device.pause()
 
-    async def send_current_state(self, websocket):
-        await send_current_state(
-            websocket, 
+    def get_current_state(self) -> Tuple[int, str]:
+        return (
             int(self.device.get_current_track_info()["playlist_position"]) - 1,
             self.device.get_current_transport_info()["current_transport_state"],
         )
-
-    @property
-    def playlist_position(self) -> int:
-        return self.device.get_current_track_info()['playlist_position']
 
 
 def create_sonos_controllers() -> Dict[str, SonosController]:
@@ -111,47 +84,3 @@ def create_sonos_controllers() -> Dict[str, SonosController]:
         device.player_name : SonosController(device)
         for device in soco.discovery.discover()
     }
-
-
-async def send_current_state(
-    websocket: web.WebSocketResponse, 
-    current_track: int, 
-    state: str
-):
-    try:
-        await websocket.send_json(
-            {
-                'action': 'current_track',
-                'track': current_track,
-                'state': state,
-            }
-        )
-    except ConnectionResetError:
-        pass
-
-def callback(websockets, controller, event):
-
-    for websocket in websockets.copy():
-        asyncio.create_task(
-            send_current_state(
-                websocket, 
-                int(event.variables['current_track']) - 1, 
-                event.variables['transport_state'],
-            )
-        )
-
-
-async def setup_subscriptions(
-    controllers: ValuesView[soco.SoCo], 
-    websockets: DefaultDict[str, Set[web.WebSocketResponse]]
-) -> Dict[str, events_asyncio.Subscription]:
-
-    subscriptions = {}
-    for controller in controllers:
-        subscription = await controller.device.avTransport.subscribe()
-        subscription.callback = functools.partial(
-            callback, websockets[controller.device.player_name], controller
-        )
-        subscriptions[controller.device.player_name] = subscription
-
-    return subscriptions

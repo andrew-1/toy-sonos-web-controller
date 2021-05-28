@@ -1,50 +1,61 @@
+"""Code to serve html to client and communicate with client
+through websockets
+""" 
+
 import asyncio
-from collections import Counter
+from collections import namedtuple
 import json
 import os
+import typing
+from typing import List, Dict
 
 import aiohttp_jinja2
 import aiohttp
 from aiohttp import web
-from PIL import Image
-
-from sonos import SonosController
 
 
-def _get_background_image(file_name):
+if typing.TYPE_CHECKING:
+    from sonos import SonosController, QueueItem
+    from aiohttp import ClientSession
 
-    with Image.open(file_name, "r") as im:
-        im = im.resize((150, 150)).convert("RGB")
-        pixels = list(
-            tuple(v // 10 for v in rgb)
-            for rgb in im.getdata()
-        )
-        return tuple(10 * v for v in Counter(pixels).most_common(1)[0][0])
 
-async def _cache_art(album, session) -> bool:
-    if os.path.isfile(album.cached_art_file_name):
+AlbumArt = namedtuple("Album", "server_uri, sonos_uri")
+
+
+async def _download_art_to_server(album: AlbumArt, session) -> bool:
+    if os.path.isfile(album.server_uri):
         return False
 
-    async with session.get(album.art_uri) as response:
-        with open(album.cached_art_file_name, "wb") as f:
-            f.write(await response.content.read())
-
-    rgb = _get_background_image(album.cached_art_file_name)
-    with open(album.cached_art_file_name + ".background", "w") as f:
-        f.write("({},{},{})".format(*rgb))
+    try:
+        async with session.get(album.sonos_uri) as response:
+            with open(album.server_uri, "wb") as f:
+                f.write(await response.content.read())
+    except ValueError:
+        # if something goes wrong whilst trying to download the art
+        # delete the file
+        os.remove(album.server_uri)
+        return False
 
     return True
 
 
-async def cache_art_and_send_update(albums, websockets, session):
-    # want to do this in order, bandwidth for io on device seems
-    # to be limited (based on my perception - not tested), 
-    # so would prefer first images to load first
+async def _get_albums(queue: List['QueueItem']) -> Dict[AlbumArt, None]:
+    # a dictionary is used here to preserve insertion order
+    return {
+        AlbumArt(item.server_art_uri, item.sonos_art_uri): None
+        for item in queue
+    }
 
-    # make copy incase it gets mutated whilst sending message
-    
+
+async def _download_art_and_send_update(
+    queue: List['QueueItem'], 
+    websockets: List[web.WebSocketResponse],
+    session: 'ClientSession' 
+) -> None:
+
+    albums = await _get_albums(queue)
     for album in albums:
-        if not await _cache_art(album, session):
+        if not await _download_art_to_server(album, session):
             continue
 
         for websocket in websockets.copy():
@@ -52,40 +63,90 @@ async def cache_art_and_send_update(albums, websockets, session):
                 await websocket.send_json(
                     {
                         'action': 'load_image', 
-                        'src': album.cached_art_file_name,
-                        'background_colour': album.back_ground_colour,
+                        'src': album.server_uri,
                     }
                 )
             except ConnectionResetError:
-                # something happened to the websocket whilst iterating
                 pass
 
-async def download_art(albums, websockets, client_session):
+
+async def _download_art(queue, websockets, client_session):
     # art downloads quite slowly so this downloads the art then
     # sends a message all active sessions to reload art when available
     asyncio.create_task(
-        cache_art_and_send_update(albums, websockets, client_session)
+        _download_art_and_send_update(queue, websockets, client_session)
     )
 
 
-def get_sonos_controller(app, path: str) -> SonosController:
+def _get_sonos_controller(app, path: str) -> 'SonosController':
     paths = app['controller_paths']
     controller_name = paths.get(path.lower(), "Living Room")
     return app['controllers'][controller_name]
 
 
-def render_html(request, albums, controller):
+async def _send_current_state(
+    websocket: web.WebSocketResponse, 
+    current_track: int, 
+    state: str
+):
+    try:
+        await websocket.send_json(
+            {
+                'action': 'current_track',
+                'track': current_track,
+                'state': state,
+            }
+        )
+    except ConnectionResetError:
+        pass
+
+
+async def _send_reload_message(websocket: web.WebSocketResponse):
+    try:
+        await websocket.send_json({'action': 'reload'})
+    except ConnectionResetError:
+        pass
+
+
+def _request_page_reload(websockets):
+    for websocket in websockets.copy():
+        asyncio.create_task(
+            _send_reload_message(websocket)
+        )
+
+
+def callback(
+    websockets: List[web.WebSocketResponse], 
+    controller: 'SonosController', 
+    event
+):
+    """Callback function used by soco asyncio library to register
+    a change of state on the device
+    """
+    # event is basically igored, it's just being used as a trigger to 
+    # tell the code something changed
+    if controller.has_queue_changed():
+        _request_page_reload(websockets)
+        return
+
+    # might be wise to work out whether the state has changed in a 
+    # relevant way rather than just sending it out over and over again
+    for websocket in websockets.copy():
+        asyncio.create_task(
+            _send_current_state(
+                websocket, 
+                *controller.get_current_state(),
+            )
+        )
+
+
+def render_html(request, queue):
     return aiohttp_jinja2.render_template(
-        'index.html', 
-        request, 
-        {
-            "albums": albums, 
-            "playlist_position": int(controller.playlist_position) - 1
-        }
+        'index.html', request, {"queue": queue}
     )
 
 
-async def parse_command(message: str, controller: SonosController):
+async def parse_client_command(message: str, controller: 'SonosController'):
     message = json.loads(message)
     
     commands = {
@@ -102,24 +163,26 @@ async def parse_command(message: str, controller: SonosController):
 
 async def index(request):
 
-    controller = get_sonos_controller(request.app, request.path)
-    albums = controller.albums()
+    controller = _get_sonos_controller(request.app, request.path)
+    controller.load_playlist(request.query_string)
+
+    queue = controller.get_queue()
 
     websocket = web.WebSocketResponse()
     if not websocket.can_prepare(request).ok:
-        return render_html(request, albums, controller)
+        return render_html(request, queue)
 
     await websocket.prepare(request)
     websockets = request.app['websockets'][controller.name]
     websockets.add(websocket)
 
-    await download_art(albums, websockets, request.app['client_session'])
-    await controller.send_current_state(websocket)
+    await _download_art(queue, websockets, request.app['client_session'])
+    await _send_current_state(websocket, *controller.get_current_state())
+
     async for msg in websocket:
-        print(msg)
         if msg.type != aiohttp.WSMsgType.text:
             break
-        await parse_command(msg.data, controller)
+        await parse_client_command(msg.data, controller)
 
     websockets.remove(websocket)
 

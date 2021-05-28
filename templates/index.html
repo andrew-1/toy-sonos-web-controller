@@ -8,28 +8,23 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Icons"
     rel="stylesheet">
 </head>
-<body>
-    <hr></hr>
-    {% for album in albums %}
-        <div class="picture numbers">
-            <img
-                src="{{album.cached_art_file_name}}"
-                onerror="this.src='/static/loading.gif'"
-                id="{{album.cached_art_file_name}}_id"
-            >
-        </div>
-
-        {% for song in album.songs %}
-        <button
-            class="button"
-            id={{song.queue_position}}
-            onclick="sendCommand('play_index', [{{ song.queue_position }}]);"; 
+<body class="noselect">
+    {% for item in queue %}
+    <div 
+        class="grid-container" 
+        onclick="playIndex({{item.position}});"
+        id={{ item.position }}
+    >
+        <img
+            class="art"
+            src="{{item.server_art_uri}}"
+            onerror="this.src='/static/loading.gif'"
+            data-arturi="{{item.server_art_uri}}"
         >
-            {{ song.title }}
-        </button>
-        {% endfor %}
-
-    <hr></hr>
+        <div class="title">{{ item.title }}</div>
+        <div class="album">{{ item.album }}</div>
+        <div class="artist">{{ item.artist }}</div>
+    </div>
     {% endfor %}
 
     <div class='footer'>
