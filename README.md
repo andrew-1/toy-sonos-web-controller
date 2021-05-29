@@ -30,8 +30,8 @@ To queue up a playlist add a ? followed by the name of the playlist e.g. http://
 I'm using it with a playlist of my kids favourite songs. This allows them to pick the ones they like to play in a really simple interface.
 
 ## How it works
-[aiohttp](https://docs.aiohttp.org/) is used to run a web server on the local network.
+[aiohttp](https://docs.aiohttp.org/) is used to run a server.
 
 [SoCo](http://docs.python-soco.com/) is used to control the speaker.
 
-websockets and javascript are used to keep the page updated when there are changes to the system.
+Websockets and javascript are used to keep the page updated when there are changes to the system.
