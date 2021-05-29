@@ -10,13 +10,13 @@
 
 .grid-container {
   display: grid;
-  grid-template-columns: 30% auto;
+  grid-template-columns: 20% auto;
   column-gap: 3mm;
   row-gap: 1mm;
   padding: 1mm;
   border-radius: 15px;
   border: 1px solid rgb(235,235,235);
-  margin: 10px
+  margin: 1mm;
 
 }
 
@@ -34,6 +34,8 @@
 .art {
     /* scroll-margin-bottom: 150px; */
     border-radius: 15px;
+    max-height: 200px;
+    max-width: 200px;
   }
 
 .title {
