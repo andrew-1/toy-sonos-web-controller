@@ -1,6 +1,7 @@
 import asyncio
 from collections import defaultdict
 import functools
+import os
 import re
 from typing import List, DefaultDict, Dict, Set
 
@@ -15,6 +16,14 @@ import sonos
 
 
 soco.config.EVENTS_MODULE = events_asyncio
+
+
+async def _create_art_cache_folder():
+    if not os.path.isdir("static"):
+        raise Exception("The script needs to be run from the root directory") 
+    
+    if not os.path.isdir("static/cache"):
+        os.mkdir("static/cache")
 
 
 async def _setup_subscriptions(
@@ -45,15 +54,18 @@ async def _get_valid_paths(controllers: List[sonos.SonosController]):
 
 
 async def init_app():
-    
     app = web.Application()
+    
     app['websockets'] = defaultdict(set) 
+
     app['controllers'] = sonos.create_sonos_controllers()
     app['subscriptions'] = await _setup_subscriptions(
         app['controllers'].values(),
         app['websockets']
     )
+
     app['client_session'] = ClientSession()
+    asyncio.create_task(_create_art_cache_folder())
 
     app['controller_paths'] = await _get_valid_paths(app['controllers'])
     for path in app['controller_paths']:
