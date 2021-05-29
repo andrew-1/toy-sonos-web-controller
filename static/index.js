@@ -4,6 +4,15 @@ let wsUri = (window.location.protocol=='https:'&&'wss://'||'ws://')+window.locat
 let ws = new WebSocket(wsUri);
 let current_index = null;
 
+function loadImage(json) {
+    let imgs = document.querySelectorAll(".art");
+    for (let img of imgs) {
+        if (img.dataset.arturi == json.src) {
+            img.src = json.src
+        };
+    }
+}
+
 function sendCommand(command, args=[]) {
     let message = {
         command: command,
@@ -17,13 +26,20 @@ function playIndex(index) {
     updateDisplayedPlayingTrack(index)
 }
 
-function loadImage(json) {
-    let imgs = document.querySelectorAll(".art");
-    for (let img of imgs) {
-        if (img.dataset.arturi == json.src) {
-            img.src = json.src
-        };
+function updateIncrement(increment) {
+    if (!(current_index == null)) {
+        updateDisplayedPlayingTrack(current_index + increment)
     }
+}
+
+function playNext() {
+    sendCommand('play_next')
+    updateIncrement(1)
+}
+
+function playPrevious() {
+    sendCommand('play_previous')
+    updateIncrement(-1)
 }
 
 function updateDisplayedPlayingTrack(index) {
