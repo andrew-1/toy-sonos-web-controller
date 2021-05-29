@@ -10,9 +10,10 @@
 
 .grid-container {
   display: grid;
-  grid-template-columns: 20% auto;
-  grid-gap: 10px;
-  padding: 10px;
+  grid-template-columns: 30% auto;
+  column-gap: 3mm;
+  row-gap: 1mm;
+  padding: 1mm;
   border-radius: 15px;
   border: 1px solid rgb(235,235,235);
   margin: 10px
@@ -36,17 +37,17 @@
   }
 
 .title {
-  font-size: 30px;
+  font-size: large;
   color: black;
 }
 
 .artist {
-  font-size: 20px;
+  font-size: medium;
   color: darkgray;
 }
 
 .album {
-  font-size: 20px;
+  font-size: medium;
   color: darkgray;
 }
 
@@ -64,16 +65,8 @@ hr {
   text-align: center;
 }
 
-i.material-icons {font-size: 100px !important;}
+i.material-icons {font-size: 48px !important;}
 
-@media only screen and (min-width: 960px)  and (max-width: 1140px){
-  i.material-icons {font-size: 100px !important;}
-}
-
-@media only screen and (min-width: 768px) and (max-width: 959px) {
-  i.material-icons {font-size: 150px !important;}
-}
-
-@media only screen and (min-width: 480px) and (max-width: 767px) {
-  i.material-icons {font-size: 200px !important;}
+@media only screen and (max-width: 15cm) {
+    i.material-icons {font-size: 96px !important;}
 }
