@@ -2,6 +2,8 @@
 
 toy-sonos-web-controller is a simple web controller developed for my kids. It displays the queue for a sonos speaker in a browser and allows control of the playing track.
 
+<img src="readme_image.png" alt="playlist" width="300"/>
+
 ## How to run it
 
 Clone the repo and cd into the directory.
