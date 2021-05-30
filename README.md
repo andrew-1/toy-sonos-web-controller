@@ -23,7 +23,7 @@ pip install -r requirements.txt
 python server.py
 ```
 
-The above assumes that you have node installed and python3.9.
+The above assumes that you have node 16 and python3.9.
 
 ## How to use it
 
