@@ -1,0 +1,74 @@
+.noselect {
+  -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+     -khtml-user-select: none; /* Konqueror HTML */
+       -moz-user-select: none; /* Old versions of Firefox */
+        -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, currently
+                                  supported by Chrome, Edge, Opera and Firefox */
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: 20% auto;
+  column-gap: 3mm;
+  row-gap: 1mm;
+  padding: 1mm;
+  border-radius: 15px;
+  border: 1px solid rgb(235,235,235);
+  margin: 1mm;
+
+}
+
+.grid-container > div {
+  text-align: left;
+  padding: 5px 0;
+  /* font-family: sans-serif; */
+}
+
+.grid-container > img {
+  grid-row: 1 / 4;
+  width: 100%;
+}
+
+.art {
+    /* scroll-margin-bottom: 150px; */
+    border-radius: 15px;
+    max-height: 200px;
+    max-width: 200px;
+  }
+
+.title {
+  font-size: large;
+  color: black;
+}
+
+.artist {
+  font-size: medium;
+  color: darkgray;
+}
+
+.album {
+  font-size: medium;
+  color: darkgray;
+}
+
+hr {
+  border: 0px solid white;
+}
+
+.footer {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  background-color: rgba(255,255,255,0.5);
+  color: black;
+  text-align: center;
+}
+
+i.material-icons {font-size: 48px !important;}
+
+@media only screen and (max-width: 15cm) {
+    i.material-icons {font-size: 96px !important;}
+}

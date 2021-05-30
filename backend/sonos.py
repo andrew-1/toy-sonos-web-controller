@@ -12,7 +12,7 @@ import string
 import soco
 from soco.core import SoCo
 
-import art_downloader
+from backend import art_downloader
 
 
 if typing.TYPE_CHECKING:

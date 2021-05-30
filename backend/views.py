@@ -12,7 +12,7 @@ from aiohttp import web
 
 
 if typing.TYPE_CHECKING:
-    from sonos import SonosController
+    from backend.sonos import SonosController
 
 
 def _get_sonos_controller(app, path: str) -> 'SonosController':

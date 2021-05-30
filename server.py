@@ -5,14 +5,12 @@ import os
 import re
 from typing import List, DefaultDict, Dict, Set
 
-# import jinja2
-# import aiohttp_jinja2
 from aiohttp import web
 import soco
 from soco import events_asyncio
 
-import views
-import sonos
+from backend import views
+from backend import sonos
 
 soco.config.EVENTS_MODULE = events_asyncio
 

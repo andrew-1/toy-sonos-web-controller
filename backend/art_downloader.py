@@ -5,10 +5,10 @@ from typing import List
 
 from aiohttp import ClientSession, web
 
-import views
+from backend import views
 
 if typing.TYPE_CHECKING:
-    from sonos import AlbumArtDownload, SonosController
+    from backend.sonos import AlbumArtDownload, SonosController
 
 class ArtDownloader:
     def __init__(
