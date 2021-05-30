@@ -34,4 +34,6 @@ I'm using it with a playlist of my kids favourite songs. This allows them to pic
 
 [SoCo](http://docs.python-soco.com/) is used to control the speaker.
 
-Websockets and javascript are used to keep the page updated when there are changes to the system.
+[React](https://create-react-app.dev/) is used for the front end.
+
+Websockets are used to keep the page updated when there are changes to the system.
