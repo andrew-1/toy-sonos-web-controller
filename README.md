@@ -5,6 +5,7 @@ toy-sonos-web-controller is a simple web controller developed for my kids. It di
 ## How to run it
 
 Clone the repo and cd into the directory.
+Build the react app
 Create a virtual env and activate it.
 Install the requirements.
 Run the server.
@@ -13,11 +14,14 @@ On a mac or linux terminal this would be:
 ```
 git clone https://github.com/andrew-1/toy-sonos-web-controller.git toy-sonos-web-controller
 cd toy-sonos-web-controller
+npm run build
 python3.9 -m venv env
 source env/bin/activate
 pip install -r requirements.txt
 python server.py
 ```
+
+The above assumes that you have node installed and python3.9.
 
 ## How to use it
 
