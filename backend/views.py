@@ -12,7 +12,7 @@ from aiohttp import web
 
 
 if typing.TYPE_CHECKING:
-    from backend.sonos import SonosController
+    from sonos import SonosController
 
 
 def _get_sonos_controller(app, path: str) -> 'SonosController':
@@ -34,7 +34,7 @@ def callback(
 
 
 def html_response():
-    with open("./build/index.html", "r") as f:
+    with open("../frontend/build/index.html", "r") as f:
        return web.Response(text=f.read(), content_type='text/html')
 
 async def _send_message(websocket: web.WebSocketResponse, message: Dict):
@@ -83,8 +83,6 @@ async def parse_client_command(
 async def index(request):
     controller = _get_sonos_controller(request.app, request.path)
     controller.load_playlist(request.query_string)
-
-    queue = controller.get_queue()
 
     websocket = web.WebSocketResponse()
     if not websocket.can_prepare(request).ok:

@@ -9,8 +9,8 @@ from aiohttp import web
 import soco
 from soco import events_asyncio
 
-from backend import views
-from backend import sonos
+import views
+import sonos
 
 soco.config.EVENTS_MODULE = events_asyncio
 
@@ -23,7 +23,7 @@ async def _create_art_cache_folder():
         os.mkdir("cache")
 
 
-async def _setup_subscriptions(
+async def _setup_sonos_event_subscriptions(
     controllers: List[sonos.SonosController], 
     websockets: DefaultDict[str, Set[web.WebSocketResponse]]
 ) -> Dict[str, events_asyncio.Subscription]:
@@ -55,7 +55,7 @@ async def init_app():
     app['websockets'] = defaultdict(set) 
 
     app['controllers'] = sonos.create_sonos_controllers(app['websockets'])
-    app['subscriptions'] = await _setup_subscriptions(
+    app['subscriptions'] = await _setup_sonos_event_subscriptions(
         app['controllers'].values(),
         app['websockets']
     )
@@ -67,7 +67,7 @@ async def init_app():
         app.router.add_get(path, views.index)
     app.add_routes([
         web.static('/cache', './cache'),
-        web.static('/static', './build/static'),
+        web.static('/static', '../frontend/build/static'),
     ])
 
     app.on_shutdown.append(shutdown)

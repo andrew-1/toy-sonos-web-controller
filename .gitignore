@@ -1,4 +1,4 @@
-backend/env*
+backend/venv*
 frontend/build*
 .vscode*
 *__pycache__*

@@ -5,7 +5,7 @@ from typing import List
 
 from aiohttp import ClientSession, web
 
-from backend import views
+import views
 
 if typing.TYPE_CHECKING:
     from backend.sonos import AlbumArtDownload, SonosController
@@ -31,6 +31,7 @@ class ArtDownloader:
     
     async def _download_art_to_server(self, album: 'AlbumArtDownload') -> None:
         try:
+            print("downloading: ",album.sonos_uri)
             async with self.client_session.get(album.sonos_uri) as response:
                 with open(album.server_uri, "wb") as f:
                     async for data in response.content.iter_any():
@@ -53,78 +54,4 @@ class ArtDownloader:
                 album.server_uri, download_art, controller
             ))
 
-
-
-# async def _download_art_to_server(
-#     album: 'AlbumArtDownload', 
-#     session: 'ClientSession', 
-# ) -> None:
-
-#     try:
-#         async with session.get(album.sonos_uri) as response:
-#             with open(album.server_uri, "wb") as f:
-#                 async for data in response.content.iter_any():
-#                     f.write(data)
-#     except ValueError:
-#         # if something goes wrong whilst trying to download the art
-#         # delete the file
-#         os.remove(album.server_uri)
-    
-
-# async def _download_art(
-#     queue: List['QueueItem'], 
-#     websockets: Set[web.WebSocketResponse], 
-#     client_session: ClientSession, 
-#     controller: 'SonosController', 
-#     art_queue: asyncio.Queue
-# ):
-#     """Loops through all albums, creates coroutine to download art
-#     creates sync functions to update the availablity of the art in the 
-#     queue and to update the queue on the server
-#     """
-#     # art downloads quite slowly so this downloads the art then
-#     # sends a message all active sessions to reload art when available
-#     albums = await _get_album_art_not_downloaded(queue)
-#     for album in albums:
-#         download_art = lambda album=album: (
-#             _download_art_to_server(album, client_session)
-#         )
-
-#         update_availability = lambda album=album: (
-#             controller.update_art_availablity(album.server_uri)
-#         )
-#         update_queue = lambda: _send_queue(websockets, controller)
-
-#         await art_queue.put((
-#             album.server_uri, download_art, 
-#             update_availability, update_queue
-#         ))
-
-
-# async def _download_art(
-#     albums: List[AlbumArtDownload]
-#     client_session: ClientSession, 
-#     controller: 'SonosController', 
-#     art_queue: asyncio.Queue
-# ):
-#     """Loops through all albums, creates coroutine to download art
-#     creates sync functions to update the availablity of the art in the 
-#     queue and to update the queue on the server
-#     """
-#     # art downloads quite slowly so this downloads the art then
-#     # sends a message all active sessions to reload art when available
-#     for album in albums:
-#         download_art = lambda album=album: (
-#             _download_art_to_server(album, client_session)
-#         )
-
-#         update_availability = lambda album=album: (
-#             controller.update_art_availablity(album.server_uri)
-#         )
-#         update_queue = lambda: _send_queue(websockets, controller)
-
-#         await art_queue.put((
-#             album.server_uri, download_art, 
-#             update_availability, update_queue
-#         ))
 
