@@ -6,19 +6,23 @@ toy-sonos-web-controller is a simple web controller developed for my kids. It di
 
 ## How to run it
 
-Clone the repo and cd into the directory.
+Clone the repo and navigate to the frontend directory.
+install the node dependencies
 Build the react app
-Create a virtual env and activate it.
+Navigate to the backend directory.
+Create a virtual environment and activate it.
 Install the requirements.
 Run the server.
 
 On a mac or linux terminal this would be:
 ```
 git clone https://github.com/andrew-1/toy-sonos-web-controller.git toy-sonos-web-controller
-cd toy-sonos-web-controller
+cd toy-sonos-web-controller/frontend
+npm install
 npm run build
-python3.9 -m venv env
-source env/bin/activate
+cd ../backend/
+python3.9 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 python server.py
 ```
@@ -36,7 +40,7 @@ To queue up a playlist add a ? followed by the name of the playlist e.g. http://
 I'm using it with a playlist of my kids favourite songs. This allows them to pick the ones they like to play in a really simple interface.
 
 ## How it works
-[aiohttp](https://docs.aiohttp.org/) is used to run a server.
+[aiohttp](https://docs.aiohttp.org/) is used for the server.
 
 [SoCo](http://docs.python-soco.com/) is used to control the speaker.
 
