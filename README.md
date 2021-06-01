@@ -7,8 +7,8 @@ toy-sonos-web-controller is a simple web controller developed for my kids. It di
 ## How to run it
 
 Clone the repo and navigate to the frontend directory.
-install the node dependencies
-Build the react app
+Install the node dependencies.
+Build the react app.
 Navigate to the backend directory.
 Create a virtual environment and activate it.
 Install the requirements.
