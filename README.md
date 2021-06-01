@@ -14,7 +14,7 @@ Create a virtual environment and activate it.
 Install the requirements.
 Run the server.
 
-On a mac or linux terminal this would be:
+On a mac or linux machine with python3.9 & node 16 installed this would be:
 ```
 git clone https://github.com/andrew-1/toy-sonos-web-controller.git toy-sonos-web-controller
 cd toy-sonos-web-controller/frontend
@@ -26,8 +26,6 @@ source venv/bin/activate
 pip install -r requirements.txt
 python server.py
 ```
-
-The above assumes that you have node 16 and python3.9.
 
 ## How to use it
 
