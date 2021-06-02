@@ -31,9 +31,10 @@ async def create_sonos_controllers() -> dict[str, SonosController]:
         queue = asyncio.Queue()
         art_downloader = ArtDownloader(client_session, queue)
         asyncio.create_task(art_downloader.run_queue())
-
+        
+        queue_sender = views.send_queue
         controllers[device.player_name] = SonosController(
-            device, art_downloader, event_handler
+            device, art_downloader, event_handler, queue_sender
         )
 
     return controllers

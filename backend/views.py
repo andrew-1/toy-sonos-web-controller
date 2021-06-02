@@ -21,9 +21,10 @@ def _get_sonos_controller(app, path: str) -> SonosController:
     return app['controllers'][controller_name]
 
 
-def html_response():
+def _html_response() -> web.Response:
     with open("../frontend/build/index.html", "r") as f:
        return web.Response(text=f.read(), content_type='text/html')
+
 
 async def _send_message(websocket: web.WebSocketResponse, message: dict):
     try:
@@ -33,7 +34,7 @@ async def _send_message(websocket: web.WebSocketResponse, message: dict):
 
 
 def send_queue(
-    websockets: list[web.WebSocketResponse], 
+    websockets: set[web.WebSocketResponse], 
     controller: SonosController, 
 ):
     queue = controller.get_queue()
@@ -55,7 +56,7 @@ def send_queue(
 async def parse_client_command(
     message: str,
     controller: SonosController,
-    websockets: list[web.WebSocketResponse],
+    websockets: set[web.WebSocketResponse],
 ):
     message = json.loads(message)
     
@@ -74,7 +75,7 @@ async def index(request):
 
     websocket = web.WebSocketResponse()
     if not websocket.can_prepare(request).ok:
-        return html_response()
+        return _html_response()
 
     await websocket.prepare(request)
     websockets = controller.websockets

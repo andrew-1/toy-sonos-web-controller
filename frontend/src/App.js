@@ -8,11 +8,13 @@ class Track extends React.Component {
     super(props);
     this.boxRef = React.createRef();
   }
+
   componentDidMount () {
     if (this.props.current_track) {
       this.boxRef.current.scrollIntoView({behavior: "smooth"});
     }
   }
+
   render() {
     let props = this.props
     return (
@@ -39,8 +41,8 @@ class Track extends React.Component {
       <div className="album">{props.album}</div>
       <div className="artist">{props.artist}</div>
     </div>
-  )
-    }
+    )
+  }
 }
 
 function Footer(props) {
@@ -58,10 +60,7 @@ function Footer(props) {
 class App extends React.Component {
   constructor(props) {
     super(props)
-    
     console.log(this.getWebSocketURI())
-
-  
     const websocket = new WebSocket(this.getWebSocketURI())
     this.state = {
       websocket: websocket,
@@ -84,13 +83,13 @@ class App extends React.Component {
 
   onMessage(event) {
     let json = JSON.parse(event.data);
-    console.log(json)
+    console.log(json);
     this.setState({
       playlist: json.data,
       current_index: json.current_track,
       state: json.state === "TRANSITIONING" ? this.state.state: json.state
-    })
-};
+    });
+  }
 
   sendCommand(command, args=[]) {
     let message = {

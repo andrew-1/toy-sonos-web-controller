@@ -11,7 +11,6 @@ from soco import events_asyncio
 
 
 if TYPE_CHECKING:
-    from backend.sonos import SonosController
     from soco.events_asyncio import Subscription
 
 soco.config.EVENTS_MODULE = events_asyncio
@@ -24,7 +23,7 @@ class SonosEventHandler:
         self._events: list[dict] = [
             {}, defaultdict(str), defaultdict(str)
         ]
-        self.controller_callback: SonosController = None
+        self.controller_callback = None
 
     def _callback(self, event):
 
@@ -48,7 +47,7 @@ class SonosEventHandler:
             if isinstance(v, str)
         }
         events = self._events
-        events[:] = events[-2], events[-1], variables
+        events[:] = events[-2:], events[-1], variables
         
         different_number_of_tracks = lambda: (
             events[-2]['number_of_tracks'] != events[-1]['number_of_tracks']

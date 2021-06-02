@@ -7,14 +7,13 @@ from typing import TYPE_CHECKING
 import os
 import string
 
-import views
-
 
 if TYPE_CHECKING:
     from aiohttp import web
     from soco.core import SoCo
     from art_downloader import ArtDownloader
     from events import SonosEventHandler
+    from typing import Callable
 
 
 @dataclass
@@ -39,12 +38,14 @@ class SonosController:
     """Wrapper for soco library functionality"""
 
     def __init__(
-        self, device: SoCo, 
+        self, 
+        device: SoCo, 
         art_downloader: ArtDownloader, 
-        event_handler: SonosEventHandler
+        event_handler: SonosEventHandler,
+        queue_sender: Callable[[set[web.WebSocketResponse], SonosController], None]
     ) -> None:
         
-        self.device: 'SoCo' = device
+        self.device: SoCo = device
 
         self.websockets: set[web.WebSocketResponse] = set()
         self._art_downloader: ArtDownloader = art_downloader
@@ -55,7 +56,7 @@ class SonosController:
         self._queue_update_required: bool = True
         self._current_state: str = ""
         self._current_track: int = 0
-
+        self._queue_sender = queue_sender
 
     def sonos_event_callback(
         self, 
@@ -67,14 +68,14 @@ class SonosController:
         self._queue_update_required = queue_update_required
         self.current_state = current_state
         self.current_track = current_track
-        views.send_queue(self.websockets, self)
+        self._queue_sender(self.websockets, self)
 
-    def art_download_callback(self, server_uri):
+    def art_download_callback(self, server_uri: str):
         for queue_item in self._queue:
             if queue_item.server_art_uri == server_uri:
                 queue_item.art_available = True
 
-        views.send_queue(self.websockets, self)
+        self._queue_sender(self.websockets, self)
 
     @staticmethod
     def _server_art_uri(artist: str, album: str):

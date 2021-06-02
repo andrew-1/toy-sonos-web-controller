@@ -44,7 +44,7 @@ class ArtDownloader:
 
     def put_art_in_queue(
         self, 
-        album_art_downloads: List[AlbumArtDownload], 
+        album_art_downloads: list[AlbumArtDownload], 
         controller: SonosController
     ) -> None:
         for album in album_art_downloads:
