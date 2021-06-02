@@ -1,32 +1,33 @@
-import asyncio
+"""Download art from using the very slow sonos album art uris"""
+
+from __future__ import annotations
 import os
-import typing
-from typing import List
+from typing import TYPE_CHECKING
 
-from aiohttp import ClientSession, web
 
-import views
-
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
+    import asyncio
     from backend.sonos import AlbumArtDownload, SonosController
+    from aiohttp import ClientSession
+
 
 class ArtDownloader:
+    """Downloads art for speaker queues"""
     def __init__(
         self, 
-        websockets: List[web.WebSocketResponse]
+        client_session: ClientSession, 
+        queue: asyncio.Queue
     ) -> None:
         
-        self.client_session = ClientSession()
-        self.queue = asyncio.Queue()
-        self.websockets = websockets
+        self.client_session = client_session
+        self.queue = queue
 
     async def run_queue(self):
         while True:
             server_uri, download_art, controller = await self.queue.get()
             if not os.path.isfile(server_uri):
                 await download_art()
-                controller.update_art_availablity(server_uri)
-                views.send_queue(self.websockets, controller)
+                controller.art_download_callback(server_uri)
             self.queue.task_done()
     
     async def _download_art_to_server(self, album: 'AlbumArtDownload') -> None:
@@ -43,8 +44,8 @@ class ArtDownloader:
 
     def put_art_in_queue(
         self, 
-        album_art_downloads: List['AlbumArtDownload'], 
-        controller: 'SonosController'
+        album_art_downloads: List[AlbumArtDownload], 
+        controller: SonosController
     ) -> None:
         for album in album_art_downloads:
             download_art = lambda album=album: (

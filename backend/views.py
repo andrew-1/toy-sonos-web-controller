@@ -2,42 +2,30 @@
 through websockets
 """ 
 
+from __future__ import annotations
 import asyncio
 import json
-import typing
-from typing import List, Dict
+from typing import TYPE_CHECKING
 
 import aiohttp
 from aiohttp import web
 
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from sonos import SonosController
 
 
-def _get_sonos_controller(app, path: str) -> 'SonosController':
+def _get_sonos_controller(app, path: str) -> SonosController:
     paths = app['controller_paths']
     controller_name = paths.get(path.lower(), "Living Room")
     return app['controllers'][controller_name]
-
-
-def callback(
-    websockets: List[web.WebSocketResponse], 
-    controller: 'SonosController', 
-    event
-):  
-    """Callback function used by soco asyncio library to register
-    a change of state on the device
-    """
-    controller.process_event(event.variables)
-    send_queue(websockets, controller)
 
 
 def html_response():
     with open("../frontend/build/index.html", "r") as f:
        return web.Response(text=f.read(), content_type='text/html')
 
-async def _send_message(websocket: web.WebSocketResponse, message: Dict):
+async def _send_message(websocket: web.WebSocketResponse, message: dict):
     try:
         await websocket.send_json(message)
     except ConnectionResetError:
@@ -45,8 +33,8 @@ async def _send_message(websocket: web.WebSocketResponse, message: Dict):
 
 
 def send_queue(
-    websockets: List[web.WebSocketResponse], 
-    controller: 'SonosController', 
+    websockets: list[web.WebSocketResponse], 
+    controller: SonosController, 
 ):
     queue = controller.get_queue()
     current_track, state = controller.current_track, controller.current_state
@@ -66,8 +54,8 @@ def send_queue(
 
 async def parse_client_command(
     message: str,
-    controller: 'SonosController',
-    websockets: List[web.WebSocketResponse],
+    controller: SonosController,
+    websockets: list[web.WebSocketResponse],
 ):
     message = json.loads(message)
     
@@ -89,7 +77,7 @@ async def index(request):
         return html_response()
 
     await websocket.prepare(request)
-    websockets = request.app['websockets'][controller.name]
+    websockets = controller.websockets
     websockets.add(websocket)
 
     send_queue(websockets, controller)
