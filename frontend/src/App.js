@@ -46,7 +46,6 @@ class Track extends React.Component {
 }
 
 function Footer(props) {
-  console.log("state " + props.state)
   return (
     <div className='footer'>
       <i className="material-icons" onClick={props.playPrevious}>skip_previous</i>
@@ -57,6 +56,7 @@ function Footer(props) {
     </div>
   )
 }
+
 class App extends React.Component {
   constructor(props) {
     super(props)
@@ -144,9 +144,6 @@ class App extends React.Component {
       return "http://localhost:8080/"
     }
     return ""
-    console.log(window.location.protocol + window.location.host + "/")
-    return window.location.protocol + window.location.host + "/";
-
   }
 
   render() {

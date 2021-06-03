@@ -5,7 +5,9 @@ through websockets
 from __future__ import annotations
 import asyncio
 import json
+from string import Template
 from typing import TYPE_CHECKING
+
 
 import aiohttp
 from aiohttp import web
@@ -21,9 +23,11 @@ def _get_sonos_controller(app, path: str) -> SonosController:
     return app['controllers'][controller_name]
 
 
-def _html_response() -> web.Response:
+def _html_response(name: str) -> web.Response:
+
     with open("../frontend/build/index.html", "r") as f:
-       return web.Response(text=f.read(), content_type='text/html')
+       template = Template(f.read())
+    return web.Response(text=template.substitute(TITLE=name), content_type='text/html')
 
 
 async def _send_message(websocket: web.WebSocketResponse, message: dict):
@@ -75,7 +79,7 @@ async def index(request):
 
     websocket = web.WebSocketResponse()
     if not websocket.can_prepare(request).ok:
-        return _html_response()
+        return _html_response(controller.name)
 
     await websocket.prepare(request)
     websockets = controller.websockets

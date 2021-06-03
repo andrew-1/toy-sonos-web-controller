@@ -46,7 +46,8 @@ class SonosController:
     ) -> None:
         
         self.device: SoCo = device
-
+        self.name: str = device.player_name
+        
         self.websockets: set[web.WebSocketResponse] = set()
         self._art_downloader: ArtDownloader = art_downloader
         event_handler.controller_callback = self.sonos_event_callback
