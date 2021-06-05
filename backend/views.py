@@ -58,7 +58,8 @@ def send_queue(
 
 async def index(request):
     controller = _get_sonos_controller(request.app, request.path)
-    controller.load_playlist(request.query_string)
+    request.app["playback_controllers"][controller.name].load_playlist(request.query_string)
+    # controller.load_playlist(request.query_string)
 
     websocket = web.WebSocketResponse()
     if not websocket.can_prepare(request).ok:

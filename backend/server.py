@@ -66,6 +66,7 @@ async def init_object_model() -> tuple[
     playback_controllers: dict[str, PlaybackController] = {}
     clean_ups: list[Callable[[], Awaitable[None]]] = []
 
+    device: SoCo
     for device in soco.discovery.discover():
 
         art_downloader = init_art_downloader()
@@ -74,7 +75,10 @@ async def init_object_model() -> tuple[
             init_playback_controller(device)
 
         controller = SonosController(
-            device, art_downloader.enqueue_art, views.send_queue
+            playback_controller.get_queue, 
+            device.player_name, 
+            art_downloader.enqueue_art, 
+            views.send_queue,
         )
 
         event_handler = await init_event_handler(

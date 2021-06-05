@@ -1,13 +1,16 @@
 from __future__ import annotations
 from functools import partial
 import json
+import os
+import string
 from typing import Callable, TYPE_CHECKING
 
+from sonos import QueueItem
 
 if TYPE_CHECKING:
     from soco.core import SoCo
     from queued_executors import LastInQueuedThreadExecutor
-
+    
 
 class PlaybackController:
     """Play commands in soco block, if multiple skips are applied
@@ -22,7 +25,8 @@ class PlaybackController:
         play_pause_queue: LastInQueuedThreadExecutor,
         play_index_queue: LastInQueuedThreadExecutor,
     ) -> None:
-        
+
+        self._device = device
         self.command_queue = {
             "play_index": (
                 device.play_from_queue,
@@ -53,6 +57,49 @@ class PlaybackController:
             self._play_pause_queue.tasks_completed 
             and self._play_index_queue.tasks_completed
         )
+
+    def load_playlist(self, name):
+        for p in self._device.get_sonos_playlists():
+            if p.title.lower() == name:
+                self._device.clear_queue()
+                self._device.add_to_queue(p)
+                return
+
+    def _get_device_queue(self):
+        """This polls the sonos system to find out if the queue has 
+        changed. It might be better to execute this in a seperate thread.
+        """
+        return self._device.get_queue(
+            full_album_art_uri=True, 
+            max_items=9999999
+        )
+
+    @staticmethod
+    def _server_art_uri(artist: str, album: str):
+        ascii_lower_case = set(c for c in string.ascii_letters)
+        a_z_only = lambda s: "".join(c for c in s if c in ascii_lower_case)
+        path = f"cache/{a_z_only(artist)}___{a_z_only(album)}.png"
+        available = os.path.isfile(path)
+        return path, available
+
+    def get_queue(self):
+        get = lambda song, attr: getattr(song, attr, "Unknown")
+        return [
+            QueueItem(
+                get(song, "title"), 
+                get(song, "album"), 
+                get(song, "creator"), 
+                get(song, "album_art_uri"), 
+                i,
+                *self._server_art_uri(
+                    get(song, "creator"), 
+                    get(song, "album")
+                )
+            )
+            for i, song in enumerate(self._get_device_queue())
+        ]
+
+
 
 def _playback_controller_queues_empty(play_pause_queue, play_index_queue):
     return (

@@ -4,14 +4,12 @@ from __future__ import annotations
 import asyncio
 from collections import namedtuple
 from dataclasses import dataclass, asdict
-import os
-import string
+
 from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
     from aiohttp import web
-    from soco.core import SoCo
     from typing import Callable, Iterable
 
 
@@ -38,14 +36,14 @@ class SonosController:
 
     def __init__(
         self, 
-        device: SoCo, 
+        get_device_queue: Callable[[], list[QueueItem]], 
+        name: str,
         enqueue_art: Callable[[Iterable[AlbumArtDownload], Callable[[str], None]], None], 
         queue_sender: Callable[[set[web.WebSocketResponse], SonosController], None]
     ) -> None:
         
-        self.device: SoCo = device
-        self.name: str = device.player_name
-
+        self.name: str = name
+        self._get_queue = get_device_queue
         self.websockets: set[web.WebSocketResponse] = set()
 
         self._queue: list[QueueItem] = []
@@ -70,7 +68,6 @@ class SonosController:
         self._queue_update_required = queue_update_required
         self.current_state = current_state
         self.current_track = current_track
-
         self._queue_sender(self.websockets, self)
 
     def callback_art_downloaded(self, server_uri: str):
@@ -80,23 +77,6 @@ class SonosController:
 
         self._queue_sender(self.websockets, self)
 
-    @staticmethod
-    def _server_art_uri(artist: str, album: str):
-        ascii_lower_case = set(c for c in string.ascii_letters)
-        a_z_only = lambda s: "".join(c for c in s if c in ascii_lower_case)
-        path = f"cache/{a_z_only(artist)}___{a_z_only(album)}.png"
-        available = os.path.isfile(path)
-        return path, available
-
-    def _get_device_queue(self):
-        """This polls the sonos system to find out if the queue has 
-        changed. It might be better to execute this in a seperate thread.
-        """
-
-        return self.device.get_queue(
-            full_album_art_uri=True, 
-            max_items=9999999
-        )
 
     def _feed_art_downloader(self) -> None:
         """returns an iterable of namedtuples with album art uris"""
@@ -115,28 +95,8 @@ class SonosController:
         if not self._queue_update_required:
             return self._queue
         self._queue_update_required = False
-        get = lambda song, attr: getattr(song, attr, "Unknown")
-        self._queue[:] = [
-            QueueItem(
-                get(song, "title"), 
-                get(song, "album"), 
-                get(song, "creator"), 
-                get(song, "album_art_uri"), 
-                i,
-                *self._server_art_uri(
-                    get(song, "creator"), 
-                    get(song, "album")
-                )
-            )
-            for i, song in enumerate(self._get_device_queue())
-        ]
+        self._queue = self._get_queue()
         self._feed_art_downloader()
         return self._queue
 
-    def load_playlist(self, name):
-        for p in self.device.get_sonos_playlists():
-            if p.title.lower() == name:
-                self.device.clear_queue()
-                self.device.add_to_queue(p)
-                return
 
