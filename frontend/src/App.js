@@ -78,7 +78,6 @@ class App extends React.Component {
 
   onWebSocketOpen(event) {
     console.log("socket openened")
-    this.sendCommand("get_queue")
   }
 
   onMessage(event) {
@@ -99,32 +98,16 @@ class App extends React.Component {
     return this.state.websocket.send(JSON.stringify(message))
   }  
 
-  playNext() {
-    console.log("playnext")
-    this.setState(
-      {current_index: this.state.current_index + 1}
-    )
-    this.sendCommand("play_next")
-
-  }
-
-  playPrevious() {
-    this.setState(
-      {current_index: this.state.current_index - 1}
-    )
-    this.sendCommand("play_previous")
-  }
-
-  playIndex(index) {
-    this.setState({current_index: index});
-    this.sendCommand("play_index", [index]);
+  play(increment, index=this.state.current_index) {
+    console.log(increment, index)
+    this.sendCommand("play_index", [index + increment])
+    this.setState({current_index: index + increment})
   }
 
   playPause() {
     if (this.state.state === "PLAYING") {
       this.sendCommand("pause")
       this.setState({state: "PAUSED_PLAYBACK"})
-
     } else {
       this.sendCommand("play")
       this.setState({state: "PLAYING"})
@@ -165,15 +148,15 @@ class App extends React.Component {
           server_art_uri = {this.getServerPath() + track.server_art_uri}
           art_available = {track.art_available}
           current_track = {track.position === this.state.current_index}
-          onClick = {(index) => this.playIndex(index)}
+          onClick = {(index) => this.play(0, index)}
         />
       )
     });
     
     const footer = (
       <Footer 
-        playPrevious = {() => this.playPrevious()} 
-        playNext = {() => this.playNext()} 
+        playPrevious = {() => this.play(-1)} 
+        playNext = {() => this.play(1)} 
         playPause = {() => this.playPause()}
         state = {this.state.state}
       />

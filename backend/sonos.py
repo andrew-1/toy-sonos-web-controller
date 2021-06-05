@@ -1,19 +1,18 @@
 """Wrap for SoCo library features required for project"""
 
 from __future__ import annotations
+import asyncio
 from collections import namedtuple
 from dataclasses import dataclass, asdict
-from typing import TYPE_CHECKING
 import os
 import string
+from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
     from aiohttp import web
     from soco.core import SoCo
-    from art_downloader import ArtDownloader
-    from events import SonosEventHandler
-    from typing import Callable
+    from typing import Callable, Iterable
 
 
 @dataclass
@@ -31,7 +30,7 @@ class QueueItem:
         return asdict(self)
 
 
-AlbumArtDownload = namedtuple("Album", "server_uri, sonos_uri")
+AlbumArtDownload = namedtuple("AlbumArtDownload", "server_uri, sonos_uri")
 
 
 class SonosController:
@@ -40,26 +39,28 @@ class SonosController:
     def __init__(
         self, 
         device: SoCo, 
-        art_downloader: ArtDownloader, 
-        event_handler: SonosEventHandler,
+        enqueue_art: Callable[[Iterable[AlbumArtDownload], Callable[[str], None]], None], 
         queue_sender: Callable[[set[web.WebSocketResponse], SonosController], None]
     ) -> None:
         
         self.device: SoCo = device
         self.name: str = device.player_name
-        
+
         self.websockets: set[web.WebSocketResponse] = set()
-        self._art_downloader: ArtDownloader = art_downloader
-        event_handler.controller_callback = self.sonos_event_callback
-        self._event_handler: SonosEventHandler = event_handler
 
         self._queue: list[QueueItem] = []
         self._queue_update_required: bool = True
         self._current_state: str = ""
         self._current_track: int = 0
+
+        self._enqueue_art = enqueue_art
         self._queue_sender = queue_sender
 
-    def sonos_event_callback(
+    async def clean_up(self) -> None:
+        for websocket in self.websockets.copy():
+            asyncio.create_task(websocket.close())
+
+    def callback_sonos_event(
         self, 
         queue_update_required: bool, 
         current_state: str, 
@@ -69,9 +70,10 @@ class SonosController:
         self._queue_update_required = queue_update_required
         self.current_state = current_state
         self.current_track = current_track
+
         self._queue_sender(self.websockets, self)
 
-    def art_download_callback(self, server_uri: str):
+    def callback_art_downloaded(self, server_uri: str):
         for queue_item in self._queue:
             if queue_item.server_art_uri == server_uri:
                 queue_item.art_available = True
@@ -87,7 +89,10 @@ class SonosController:
         return path, available
 
     def _get_device_queue(self):
-        """this is an expensive call, only want to make it if i think something has changed.."""
+        """This polls the sonos system to find out if the queue has 
+        changed. It might be better to execute this in a seperate thread.
+        """
+
         return self.device.get_queue(
             full_album_art_uri=True, 
             max_items=9999999
@@ -104,7 +109,7 @@ class SonosController:
             for item in self._queue
             if not item.art_available
         }
-        self._art_downloader.put_art_in_queue(art_to_download, self)
+        self._enqueue_art(art_to_download.keys(), self.callback_art_downloaded)
 
     def get_queue(self) -> list[QueueItem]:
         if not self._queue_update_required:
@@ -135,14 +140,3 @@ class SonosController:
                 self.device.add_to_queue(p)
                 return
 
-    def play_command(self, action, args):
-        commands = {
-            "play_index": self.device.play_from_queue,
-            "play_previous": self.device.previous,
-            "play_next": self.device.next,
-            "play": self.device.play,
-            "pause": self.device.pause,
-        }
-        do_nothing = lambda: None
-        command = commands.get(action, do_nothing)
-        command(*args)

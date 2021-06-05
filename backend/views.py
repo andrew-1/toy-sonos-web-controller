@@ -4,7 +4,6 @@ through websockets
 
 from __future__ import annotations
 import asyncio
-import json
 from string import Template
 from typing import TYPE_CHECKING
 
@@ -57,22 +56,6 @@ def send_queue(
         )
 
 
-async def parse_client_command(
-    message: str,
-    controller: SonosController,
-    websockets: set[web.WebSocketResponse],
-):
-    message = json.loads(message)
-    
-    command = message.get("command", None)
-    if command is None:
-        return
-    elif command == "get_queue":
-        send_queue(websockets, controller)
-    else:
-        controller.play_command(message["command"], message["args"])
-
-
 async def index(request):
     controller = _get_sonos_controller(request.app, request.path)
     controller.load_playlist(request.query_string)
@@ -85,13 +68,13 @@ async def index(request):
     websockets = controller.websockets
     websockets.add(websocket)
 
-    send_queue(websockets, controller)
+    send_queue({websocket}, controller)
     
     async for msg in websocket:
         print(msg)
         if msg.type != aiohttp.WSMsgType.text:
             break
-        await parse_client_command(msg.data, controller, websockets)
+        await request.app["playback_controllers"][controller.name].parse_client_command(msg.data)
 
     websockets.remove(websocket)
 

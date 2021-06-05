@@ -4,34 +4,40 @@ and triger callbacks to the controller class
 
 from __future__ import annotations
 from collections import defaultdict
-from typing import TYPE_CHECKING
+from typing import Callable
 
 import soco
 from soco import events_asyncio
 
 
-if TYPE_CHECKING:
-    from soco.events_asyncio import Subscription
-
 soco.config.EVENTS_MODULE = events_asyncio
 
 
-class SonosEventHandler:
-    def __init__(self, subscription: Subscription):
+class SocoEventHandler:
+    def __init__(
+        self, 
+        subscription: events_asyncio.Subscription,
+        callback_sonos_event: Callable[[bool, str, int], None],
+        playback_controller_queues_empty: Callable[[], bool],
+    ) -> None:
+
         self.subscription = subscription
         self.subscription.callback = self._callback
-        self._events: list[dict] = [
-            {}, defaultdict(str), defaultdict(str)
-        ]
-        self.controller_callback = None
+        self._events: list = 3 * [defaultdict(str)]
+        self._callback_sonos_event = callback_sonos_event
+        self._playback_controller_queues_empty = \
+            playback_controller_queues_empty
 
     def _callback(self, event):
+        if not self._playback_controller_queues_empty():
+            # if there are unprocessed commands don't send the update
+            return
 
         queue_update_required = self._queue_changed(event.variables)
         current_state = event.variables['transport_state']
         current_track = int(event.variables['current_track']) - 1
         
-        self.controller_callback(
+        self._callback_sonos_event(
             queue_update_required,
             current_state,
             current_track
@@ -47,7 +53,7 @@ class SonosEventHandler:
             if isinstance(v, str)
         }
         events = self._events
-        events[:] = events[-2:], events[-1], variables
+        events[:] = events[-2], events[-1], variables
         
         different_number_of_tracks = lambda: (
             events[-2]['number_of_tracks'] != events[-1]['number_of_tracks']
@@ -75,3 +81,10 @@ class SonosEventHandler:
             or is_stopped()
             or not_two_identical_events_after_a_transition()
         )
+
+    async def clean_up(self) -> None:
+        await self.subscription.unsubscribe()
+
+    @staticmethod
+    async def shutdown_event_listener():
+        await events_asyncio.event_listener.async_stop()

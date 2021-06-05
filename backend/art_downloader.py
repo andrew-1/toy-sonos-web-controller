@@ -6,30 +6,29 @@ from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    import asyncio
-    from backend.sonos import AlbumArtDownload, SonosController
+    from backend.sonos import AlbumArtDownload
     from aiohttp import ClientSession
+    from queued_executors import QueuedAsyncExecutor
+    from typing import Callable, Iterable
 
 
 class ArtDownloader:
-    """Downloads art for speaker queues"""
+    """Downloads art for speaker queues
+    io on the sonos is quite slow so this is done concurrently using
+    async
+    """
     def __init__(
         self, 
-        client_session: ClientSession, 
-        queue: asyncio.Queue
+        client_session: ClientSession,
+        queue: QueuedAsyncExecutor,
     ) -> None:
         
         self.client_session = client_session
-        self.queue = queue
+        self.queue = queue 
 
-    async def run_queue(self):
-        while True:
-            server_uri, download_art, controller = await self.queue.get()
-            if not os.path.isfile(server_uri):
-                await download_art()
-                controller.art_download_callback(server_uri)
-            self.queue.task_done()
-    
+    async def clean_up(self) -> None:
+        await self.client_session.close()
+        
     async def _download_art_to_server(self, album: 'AlbumArtDownload') -> None:
         try:
             print("downloading: ",album.sonos_uri)
@@ -38,21 +37,20 @@ class ArtDownloader:
                     async for data in response.content.iter_any():
                         f.write(data)
         except ValueError:
-            # if something goes wrong whilst trying to download the art
-            # delete the file
             os.remove(album.server_uri)
+    
+    async def command(self, album, callback_art_downloaded) -> None:
+        if not os.path.isfile(album.server_uri):
+            await self._download_art_to_server(album)
+            callback_art_downloaded(album.server_uri)
 
-    def put_art_in_queue(
+    def enqueue_art(
         self, 
-        album_art_downloads: list[AlbumArtDownload], 
-        controller: SonosController
+        album_art_downloads: Iterable[AlbumArtDownload], 
+        callback_art_downloaded: Callable[[str], None]
     ) -> None:
         for album in album_art_downloads:
-            download_art = lambda album=album: (
-                self._download_art_to_server(album)
+            self.queue.put_nowait(
+                self.command, album, callback_art_downloaded
             )
-            self.queue.put_nowait((
-                album.server_uri, download_art, controller
-            ))
-
-
+        
