@@ -99,7 +99,6 @@ class App extends React.Component {
   }  
 
   play(increment, index=this.state.current_index) {
-    console.log(increment, index)
     this.sendCommand("play_index", [index + increment])
     this.setState({current_index: index + increment})
   }
