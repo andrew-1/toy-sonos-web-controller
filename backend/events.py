@@ -36,7 +36,7 @@ class SocoEventHandler:
         queue_update_required = self._queue_changed(event.variables)
         current_state = event.variables['transport_state']
         current_track = int(event.variables['current_track']) - 1
-        
+        # print("que update: ", queue_update_required)
         self._callback_sonos_event(
             queue_update_required,
             current_state,
@@ -47,6 +47,12 @@ class SocoEventHandler:
         """Attempts to work out whether queue has changed"""
         # do this on strings, as hashable objects seem to be being created
         # on each call
+        
+        values = ('number_of_tracks', 'transport_state')
+        if not all(val in event_variables for val in values):
+            # if the event doesn't have the above, ignore it
+            return
+
         variables = {
             k: v 
             for k, v in event_variables.items() 
