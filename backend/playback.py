@@ -100,7 +100,6 @@ class PlaybackController:
         ]
 
 
-
 def _playback_controller_queues_empty(play_pause_queue, play_index_queue):
     return (
         play_pause_queue.tasks_completed 

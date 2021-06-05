@@ -1,13 +1,14 @@
 from __future__ import annotations
+import asyncio
 import os
 import re
-from typing import Awaitable, Callable, TYPE_CHECKING
+from typing import Awaitable, Callable, NamedTuple, TYPE_CHECKING
 
 from aiohttp import web, ClientSession
 import soco
 
 import views
-from sonos import SonosController
+from sonos import SonosQueueState
 from events import SocoEventHandler
 from art_downloader import ArtDownloader
 from playback import PlaybackController, playback_controller_queues_empty
@@ -43,7 +44,7 @@ def init_playback_controller(
 
 async def init_event_handler(
     device: SoCo,
-    controller: SonosController, 
+    controller: SonosQueueState, 
     playback_command_queue_empty: Callable[[], bool]
 ) -> SocoEventHandler:
 
@@ -55,15 +56,40 @@ async def init_event_handler(
     )
 
 
-async def init_object_model() -> tuple[
-    dict[str, SonosController], 
-    dict[str, PlaybackController], 
-    list[Callable[[], Awaitable[None]]]
-]:
+class PlayerApp(NamedTuple):
+    name: str
+    queue_state: SonosQueueState
+    playback: PlaybackController
+    websockets: WebSockets
+
+
+class PlayerApps(NamedTuple):
+    players: dict[str, PlayerApp]
+    cleanups: list[Callable[[], Awaitable[None]]]
+
+
+class WebSockets(set):
+    async def clean_up(self) -> None:
+        for websocket in self.copy():
+            asyncio.create_task(websocket.close())
+
+    async def _send_message(self, websocket, message):
+        try:
+            await websocket.send_json(message)
+        except ConnectionResetError:
+            pass
+
+    def send_queue(self, queue: dict):
+        for websocket in self.copy():
+            asyncio.create_task(
+                self._send_message(websocket, queue)
+            )
+
+
+async def init_object_model() -> PlayerApps:
     """inits the object model"""
 
-    controllers: dict[str, SonosController] = {}
-    playback_controllers: dict[str, PlaybackController] = {}
+    players: dict[str, PlayerApp] = {}
     clean_ups: list[Callable[[], Awaitable[None]]] = []
 
     device: SoCo
@@ -74,27 +100,29 @@ async def init_object_model() -> tuple[
         playback_controller, playback_command_queue_empty = \
             init_playback_controller(device)
 
-        controller = SonosController(
+        websockets = WebSockets()
+
+        controller = SonosQueueState(
             playback_controller.get_queue, 
-            device.player_name, 
             art_downloader.enqueue_art, 
-            views.send_queue,
+            websockets.send_queue,
         )
 
         event_handler = await init_event_handler(
             device, controller, playback_command_queue_empty
         )
 
-        controllers[device.player_name] = controller
-        playback_controllers[device.player_name] = playback_controller
+        players[device.player_name] = PlayerApp(
+            device.player_name, controller, playback_controller, websockets
+        )
 
-        clean_ups.append(controller.clean_up)
+        clean_ups.append(websockets.clean_up)
         clean_ups.append(event_handler.clean_up)
         clean_ups.append(art_downloader.clean_up)
 
     clean_ups.append(SocoEventHandler.shutdown_event_listener)
 
-    return controllers, playback_controllers, clean_ups
+    return PlayerApps(players, clean_ups)
 
 
 async def cleanup_object_model(
@@ -128,9 +156,7 @@ def _create_art_cache_folder():
 async def init_app():
     """Initialise sonos controller web app"""
     app = web.Application()
-
-    app['controllers'], app['playback_controllers'], app['clean_ups'] = \
-        await init_object_model()
+    app['controllers'], app['clean_ups'] = await init_object_model()
 
     app['controller_paths'] = _get_valid_paths(app['controllers'].keys())
     for path in app['controller_paths']:

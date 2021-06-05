@@ -1,7 +1,6 @@
 """Wrap for SoCo library features required for project"""
 
 from __future__ import annotations
-import asyncio
 from collections import namedtuple
 from dataclasses import dataclass, asdict
 
@@ -31,22 +30,20 @@ class QueueItem:
 AlbumArtDownload = namedtuple("AlbumArtDownload", "server_uri, sonos_uri")
 
 
-class SonosController:
+class SonosQueueState:
     """Wrapper for soco library functionality"""
 
     def __init__(
         self, 
         get_device_queue: Callable[[], list[QueueItem]], 
-        name: str,
         enqueue_art: Callable[[Iterable[AlbumArtDownload], Callable[[str], None]], None], 
-        queue_sender: Callable[[set[web.WebSocketResponse], SonosController], None]
+        queue_sender: Callable[[dict], None]
     ) -> None:
         
-        self.name: str = name
-        self._get_queue = get_device_queue
-        self.websockets: set[web.WebSocketResponse] = set()
+        self._get_device_queue = get_device_queue
 
         self._queue: list[QueueItem] = []
+        
         self._queue_update_required: bool = True
         self._current_state: str = ""
         self._current_track: int = 0
@@ -54,9 +51,6 @@ class SonosController:
         self._enqueue_art = enqueue_art
         self._queue_sender = queue_sender
 
-    async def clean_up(self) -> None:
-        for websocket in self.websockets.copy():
-            asyncio.create_task(websocket.close())
 
     def callback_sonos_event(
         self, 
@@ -68,15 +62,13 @@ class SonosController:
         self._queue_update_required = queue_update_required
         self.current_state = current_state
         self.current_track = current_track
-        self._queue_sender(self.websockets, self)
+        self._queue_sender(self.get_queue_dict())
 
     def callback_art_downloaded(self, server_uri: str):
         for queue_item in self._queue:
             if queue_item.server_art_uri == server_uri:
                 queue_item.art_available = True
-
-        self._queue_sender(self.websockets, self)
-
+        self._queue_sender(self.get_queue_dict())
 
     def _feed_art_downloader(self) -> None:
         """returns an iterable of namedtuples with album art uris"""
@@ -91,12 +83,19 @@ class SonosController:
         }
         self._enqueue_art(art_to_download.keys(), self.callback_art_downloaded)
 
-    def get_queue(self) -> list[QueueItem]:
+    def _get_queue(self) -> list[QueueItem]:
         if not self._queue_update_required:
             return self._queue
+
         self._queue_update_required = False
-        self._queue = self._get_queue()
+        self._queue = self._get_device_queue()
         self._feed_art_downloader()
         return self._queue
 
+    def get_queue_dict(self) -> dict:
+        return {
+            "data": [q_item._asdict() for q_item in self._get_queue()],
+            "current_track": self.current_track,
+            "state": self.current_state,
+        }
 
