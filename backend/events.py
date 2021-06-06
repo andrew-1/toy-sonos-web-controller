@@ -36,7 +36,6 @@ class SocoEventHandler:
         queue_update_required = self._queue_changed(event.variables)
         current_state = event.variables['transport_state']
         current_track = int(event.variables['current_track']) - 1
-        # print("que update: ", queue_update_required)
         self._callback_sonos_event(
             queue_update_required,
             current_state,
@@ -61,32 +60,31 @@ class SocoEventHandler:
         events = self._events
         events[:] = events[-2], events[-1], variables
         
-        different_number_of_tracks = lambda: (
+        different_number_of_tracks = (
             events[-2]['number_of_tracks'] != events[-1]['number_of_tracks']
         )
-        is_stopped = lambda: (
-            events[-1]['transport_state'] == "STOPPED"
-        )
-        is_not_transitioning = lambda: (
+        is_stopped = events[-1]['transport_state'] == "STOPPED"
+
+        is_not_transitioning = (
             events[-1]['transport_state'] != "TRANSITIONING"
         )
-        no_change_in_variables = lambda: (
+        no_change_in_variables = (
             not set(events[-1].items()) - set(events[-2].items())
         )
-        two_back_state_not_transitioning = lambda: (
+        two_back_state_not_transitioning = (
             events[-3]['transport_state'] != "TRANSITIONING"
         )
-        not_two_identical_events_after_a_transition = lambda: (
-            is_not_transitioning() 
-            and no_change_in_variables()
-            and two_back_state_not_transitioning()
+        not_two_identical_events_after_a_transition = (
+            is_not_transitioning 
+            and no_change_in_variables
+            and two_back_state_not_transitioning
         )
-
-        return (
-            different_number_of_tracks()
-            or is_stopped()
-            or not_two_identical_events_after_a_transition()
+        update_required = (
+            different_number_of_tracks
+            or is_stopped
+            or not_two_identical_events_after_a_transition
         )
+        return update_required
 
     async def clean_up(self) -> None:
         await self.subscription.unsubscribe()
