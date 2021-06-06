@@ -13,6 +13,24 @@ if TYPE_CHECKING:
     from controller import Controllers
 
 
+class WebSockets(set):
+    async def clean_up(self) -> None:
+        for websocket in self.copy():
+            asyncio.create_task(websocket.close())
+
+    async def _send_message(self, websocket, message):
+        try:
+            await websocket.send_json(message)
+        except ConnectionResetError:
+            pass
+
+    def send_queue(self, queue: dict):
+        for websocket in self.copy():
+            asyncio.create_task(
+                self._send_message(websocket, queue)
+            )
+
+
 def _create_art_cache_folder():
     """Create a folder to store the art if it doens't already exist"""
     if not os.path.isdir("cache"):
@@ -46,7 +64,7 @@ async def shutdown(app):
 
 
 async def a_main():
-    controllers: Controllers = await init_controllers()
+    controllers: Controllers = await init_controllers(WebSockets)
     runner = web.AppRunner(await init_app(controllers))
 
     await runner.setup()

@@ -54,24 +54,6 @@ async def init_event_handler(
     )
 
 
-class WebSockets(set):
-    async def clean_up(self) -> None:
-        for websocket in self.copy():
-            asyncio.create_task(websocket.close())
-
-    async def _send_message(self, websocket, message):
-        try:
-            await websocket.send_json(message)
-        except ConnectionResetError:
-            pass
-
-    def send_queue(self, queue: dict):
-        for websocket in self.copy():
-            asyncio.create_task(
-                self._send_message(websocket, queue)
-            )
-
-
 class Controller(NamedTuple):
     name: str
     queue_state: SonosQueueState
@@ -111,7 +93,7 @@ class Controllers(dict):
         self.update(additional_paths)
 
 
-async def init_controllers() -> Controllers:
+async def init_controllers(WebSockets) -> Controllers:
     """inits the object model"""
 
     controllers: dict[str, Controller] = {}
