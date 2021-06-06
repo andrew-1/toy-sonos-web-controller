@@ -16,10 +16,12 @@ if TYPE_CHECKING:
 
 
 def _html_response(name: str) -> web.Response:
-
     with open("../frontend/build/index.html", "r") as f:
        template = Template(f.read())
-    return web.Response(text=template.substitute(TITLE=name), content_type='text/html')
+    return web.Response(
+        text=template.substitute(TITLE=name),
+        content_type='text/html'
+    )
 
 
 async def index(request):
