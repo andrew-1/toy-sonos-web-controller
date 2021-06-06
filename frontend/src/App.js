@@ -1,6 +1,7 @@
 import './App.css';
 import React from 'react';
 import loading from './loading.gif'
+import socketIOClient from "socket.io-client";
 
 
 class Track extends React.Component {
@@ -57,10 +58,32 @@ function Footer(props) {
   )
 }
 
+// class WebSocketConnection {
+//   constructor() {
+//     this.websocket = new WebSocket(this.getWebSocketURI())
+//     console.log("Trying to open wedsocket")
+//     console.log(this.getWebSocketURI())
+//     const websocket = new WebSocket(this.getWebSocketURI());
+//     websocket.onmessage = (event) => {this.onMessage(event)};
+//     websocket.onopen = (event) => {console.log("socket opened")}
+//     websocket.onclose = (event) => {this.onWebSocketClose(event)};
+//   }
+
+//   getWebSocketURI() {
+//     if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
+//       return "ws://localhost:8080/bedroom"
+//     }
+//     const protocol = ((window.location.protocol==='https:'&&'wss://')||'ws://')
+//     return protocol + window.location.host + window.location.pathname;
+//   }
+
+// }
+
 class App extends React.Component {
   constructor(props) {
     super(props)
     this.state = {
+      backend: "aiohttp",
       websocket: null,
       playlist: [],
       current_index: null,
@@ -69,11 +92,16 @@ class App extends React.Component {
   };
 
   componentDidMount() {
-    this.openNewWebSocket()
+    if (this.state.backend === "aiohttp") {
+      this.openNewWebSocket()
+    } else if (this.state.backend === "flask") {
+      this.openNewSocketIO()
+    } 
   }
 
   openNewWebSocket() {
     console.log("Trying to open wedsocket")
+    console.log(this.getWebSocketURI())
     const websocket = new WebSocket(this.getWebSocketURI());
     websocket.onmessage = (event) => {this.onMessage(event)};
     websocket.onopen = (event) => {console.log("socket opened")}
@@ -82,12 +110,31 @@ class App extends React.Component {
     this.setState({websocket: websocket});
 
   }
+
   onWebSocketClose(event) {
     console.log("socket closed")
     setTimeout(() => {this.openNewWebSocket()}, 5000);
   }
 
+  openNewSocketIO() {
+    console.log("Trying to open socketio")
+    console.log(this.getSocketIOURI())
+    const websocket = socketIOClient(this.getSocketIOURI());
+    websocket.on("message", (event) => {this.onMessage(event)});
+    websocket.on("connect", (event) => {console.log("socket opened")});
+
+    websocket.on('disconnect', (event) => {this.onSocketIOClose(event)});
+    this.setState({websocket: websocket});
+
+  }
+  onSocketIOClose(event) {
+    console.log("socketio closed")
+    setTimeout(() => {this.openNewSocketIO()}, 5000);
+  }
+
+
   onMessage(event) {
+    console.log(event)
     let json = JSON.parse(event.data);
     console.log(json);
     this.setState({
@@ -102,7 +149,12 @@ class App extends React.Component {
         command: command,
         args: args,
     }
-    return this.state.websocket.send(JSON.stringify(message))
+      if (this.state.backend === "aiohttp") {
+        this.state.websocket.send(JSON.stringify(message));
+      } else if (this.state.backend === "flask") {
+        console.log("sending message...", message);
+        this.state.websocket.emit("message" , message);
+      } 
   }  
 
   play(increment, index=this.state.current_index) {
@@ -127,6 +179,15 @@ class App extends React.Component {
     const protocol = ((window.location.protocol==='https:'&&'wss://')||'ws://')
     return protocol + window.location.host + window.location.pathname;
   }
+
+  getSocketIOURI() {
+    if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
+      return "ws://localhost:8080/"
+    }
+    const protocol = ((window.location.protocol==='https:'&&'wss://')||'ws://')
+    return protocol + window.location.host + "/";
+  }
+
 
   getServerPath() {
     if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
