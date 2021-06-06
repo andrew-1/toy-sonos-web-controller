@@ -40,14 +40,13 @@ class SonosQueueState:
         queue_sender: Callable[[dict], None]
     ) -> None:
         
-        self._get_device_queue = get_device_queue
-
         self._queue: list[QueueItem] = []
         
         self._queue_update_required: bool = True
         self._current_state: str = ""
         self._current_track: int = 0
 
+        self._get_device_queue = get_device_queue
         self._enqueue_art = enqueue_art
         self._queue_sender = queue_sender
 
