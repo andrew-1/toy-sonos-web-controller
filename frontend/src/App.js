@@ -60,10 +60,8 @@ function Footer(props) {
 class App extends React.Component {
   constructor(props) {
     super(props)
-    console.log(this.getWebSocketURI())
-    const websocket = new WebSocket(this.getWebSocketURI())
     this.state = {
-      websocket: websocket,
+      websocket: null,
       playlist: [],
       current_index: null,
       state: null,
@@ -71,13 +69,22 @@ class App extends React.Component {
   };
 
   componentDidMount() {
-    const websocket = this.state.websocket
-    websocket.onmessage = (event) => {this.onMessage(event)}
-    websocket.onopen = (event) => {this.onWebSocketOpen(event)}
+    this.openNewWebSocket()
   }
 
-  onWebSocketOpen(event) {
-    console.log("socket openened")
+  openNewWebSocket() {
+    console.log("Trying to open wedsocket")
+    const websocket = new WebSocket(this.getWebSocketURI());
+    websocket.onmessage = (event) => {this.onMessage(event)};
+    websocket.onopen = (event) => {console.log("socket opened")}
+
+    websocket.onclose = (event) => {this.onWebSocketClose(event)};
+    this.setState({websocket: websocket});
+
+  }
+  onWebSocketClose(event) {
+    console.log("socket closed")
+    setTimeout(() => {this.openNewWebSocket()}, 5000);
   }
 
   onMessage(event) {
