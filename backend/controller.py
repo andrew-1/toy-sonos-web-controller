@@ -90,6 +90,7 @@ class Controllers(dict):
         self.update(controllers)
         self._clean_ups = clean_ups
         self._add_valid_paths_to_self()
+        self.paths = {p for p in self.keys() if p.startswith("/")}
 
     async def clean_up(self):
         for clean_up in self._clean_ups:
