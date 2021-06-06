@@ -59,8 +59,8 @@ class SonosQueueState:
     ) -> None:
 
         self._queue_update_required = queue_update_required
-        self.current_state = current_state
-        self.current_track = current_track
+        self._current_state = current_state
+        self._current_track = current_track
         self._queue_sender(self.get_queue_dict())
 
     def callback_art_downloaded(self, server_uri: str):
@@ -94,7 +94,6 @@ class SonosQueueState:
     def get_queue_dict(self) -> dict:
         return {
             "data": [q_item._asdict() for q_item in self._get_queue()],
-            "current_track": self.current_track,
-            "state": self.current_state,
+            "current_track": self._current_track,
+            "state": self._current_state,
         }
-
