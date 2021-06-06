@@ -12,13 +12,7 @@ from aiohttp import web
 
 
 if TYPE_CHECKING:
-    from server import PlayerApp
-
-
-def _get_sonos_controller(app, path: str) -> PlayerApp:
-    paths = app['controller_paths']
-    controller_name = paths.get(path.lower(), "Living Room")
-    return app['controllers'][controller_name]
+    from controller import Controller
 
 
 def _html_response(name: str) -> web.Response:
@@ -29,7 +23,7 @@ def _html_response(name: str) -> web.Response:
 
 
 async def index(request):
-    controller = _get_sonos_controller(request.app, request.path)
+    controller: Controller = request.app['controllers'][request.path]
     controller.playback.load_playlist(request.query_string)
 
     websocket = web.WebSocketResponse()
