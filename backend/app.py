@@ -1,9 +1,7 @@
 from __future__ import annotations
 import asyncio
-from functools import partial
 import json
 import os
-import sys
 from threading import Thread
 from typing import TYPE_CHECKING
 
@@ -17,13 +15,15 @@ if TYPE_CHECKING:
     from controller import Controller
 
 
+#TODO: move the whole app out of global state
 app = Flask(__name__, static_folder='../frontend/build', static_url_path='/')
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 
+#TODO only supports 1 room at the moment
+# need to parameterise the code
 @app.route('/bedroom')
 def bedroom():
-    print("here", flush=True, file=sys.stdout)
     return app.send_static_file('index.html')
 
 
@@ -46,15 +46,19 @@ def message(data):
 @socketio.event
 def connect():
     print("sending queue")
-    queue = controllers["Bedroom"].queue_state.get_queue_dict()
+    controller: Controller = controllers["Bedroom"]
+    queue = controller.queue_state.get_queue_dict()
     emit("message", {"data": json.dumps(queue)})
 
 
-async def outbound():
-    
-    queue = controllers["Bedroom"].queue_state.get_queue_dict()
-    socketio.emit("message", {"data": json.dumps(queue)})
+# TODO: make an abc and use it to define the variants
+# shouldn't keep 2 names
+class WebSockets:
+    def send_queue(self, queue: dict):
+        socketio.emit("message", {"data": json.dumps(queue)})
 
+    def clean_up(self):
+        pass
 
 def start_background_loop(loop):
     asyncio.set_event_loop(loop)
@@ -65,7 +69,7 @@ loop = asyncio.new_event_loop()
 t = Thread(target=start_background_loop, args=(loop,), daemon=True)
 t.start()
 
-task = asyncio.run_coroutine_threadsafe(init_controllers(), loop)
+task = asyncio.run_coroutine_threadsafe(init_controllers(WebSockets), loop)
 controllers: Controllers = task.result()
 
 try:
