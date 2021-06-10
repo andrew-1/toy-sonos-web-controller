@@ -58,7 +58,7 @@ function Footer(props) {
   )
 }
 
-class WebSocketConnection {
+class WebSocketConnectionBase {
   constructor(parent) {
     this.parent = parent
     this.openNewWebSocket()
@@ -68,7 +68,17 @@ class WebSocketConnection {
     const json = JSON.parse(event.data);
     this.parent.updateState(json)
   }
+  
+  onWebSocketClose(event) {
+    setTimeout(() => {this.openNewWebSocket()}, 5000);
+  }
 
+  sendCommand(message) {
+    this.websocket.send(JSON.stringify(message));
+  }  
+}
+
+class WebSocketConnection extends WebSocketConnectionBase {
   openNewWebSocket() {
     const websocket = new WebSocket(this.getURI());
     websocket.onmessage = (event) => {this.onMessage(event)};
@@ -83,15 +93,25 @@ class WebSocketConnection {
     }
     const protocol = ((window.location.protocol==='https:'&&'wss://')||'ws://')
     return protocol + window.location.host + window.location.pathname;
-  }
-  
-  onWebSocketClose(event) {
-    setTimeout(() => {this.openNewWebSocket()}, 5000);
+  }  
+}
+
+class SocketIOConnection extends WebSocketConnectionBase {
+  openNewWebSocket() {
+    const websocket = socketIOClient(this.getURI());
+    websocket.on("message", (event) => {this.onMessage(event)});
+    websocket.on("connect", (event) => {console.log("socket opened")});
+    websocket.on('disconnect', (event) => {this.onWebSocketClose(event)});
+    this.websocket = websocket
   }
 
-  sendCommand(message) {
-    this.websocket.send(JSON.stringify(message));
-  }  
+  getURI() {
+    if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
+      return "ws://localhost:8080/"
+    }
+    const protocol = ((window.location.protocol==='https:'&&'wss://')||'ws://')
+    return protocol + window.location.host + "/";
+  }
 }
 
 class App extends React.Component {
@@ -109,6 +129,7 @@ class App extends React.Component {
 
   componentDidMount() {
     this.websocket = new WebSocketConnection(this);
+    // this.websocket = new SocketIOConnection(this);
 
     // if (this.state.backend === "aiohttp") {
     //   this.openNewWebSocket()
@@ -127,10 +148,6 @@ class App extends React.Component {
     websocket.on('disconnect', (event) => {this.onSocketIOClose(event)});
     this.setState({websocket: websocket});
 
-  }
-  onSocketIOClose(event) {
-    console.log("socketio closed")
-    setTimeout(() => {this.openNewSocketIO()}, 5000);
   }
 
   updateState(json) {
@@ -165,13 +182,7 @@ class App extends React.Component {
     }
   }
 
-  getSocketIOURI() {
-    if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
-      return "ws://localhost:8080/"
-    }
-    const protocol = ((window.location.protocol==='https:'&&'wss://')||'ws://')
-    return protocol + window.location.host + "/";
-  }
+
 
   getServerPath() {
     if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
