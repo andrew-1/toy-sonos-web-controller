@@ -59,18 +59,22 @@ function Footer(props) {
 }
 
 class WebSocketConnection {
-  constructor(onMessage) {
-    // this.onMessage = (event) => {onMessage(event)}
- 
-    console.log("Trying to open wedsocket")
-    console.log(this.getURI())
+  constructor(parent) {
+    this.parent = parent
+    this.openNewWebSocket()
+  }
+
+  onMessage(event) {
+    const json = JSON.parse(event.data);
+    this.parent.updateState(json)
+  }
+
+  openNewWebSocket() {
     const websocket = new WebSocket(this.getURI());
-    websocket.onmessage = (event) => {onMessage(event)};
+    websocket.onmessage = (event) => {this.onMessage(event)};
     websocket.onopen = (event) => {console.log("socket opened")}
     websocket.onclose = (event) => {this.onWebSocketClose(event)};
     this.websocket = websocket
-
-    // this.sendCommand = this.sendCommand.bind(this)
   }
 
   getURI() {
@@ -82,23 +86,17 @@ class WebSocketConnection {
   }
   
   onWebSocketClose(event) {
-    console.log("socket closed")
     setTimeout(() => {this.openNewWebSocket()}, 5000);
   }
 
   sendCommand(message) {
-    let send_message = (message) => {
-      this.websocket.send(JSON.stringify(message))
-    };
-    send_message(message)
-    // this.websocket.send(JSON.stringify(message));
+    this.websocket.send(JSON.stringify(message));
   }  
 }
 
 class App extends React.Component {
   constructor(props) {
     super(props)
-    this.onMessage = this.onMessage.bind(this);
     this.websocket = null;
     this.backend = "aiohttp";
 
@@ -110,7 +108,7 @@ class App extends React.Component {
   };
 
   componentDidMount() {
-    this.websocket = new WebSocketConnection(this.onMessage);
+    this.websocket = new WebSocketConnection(this);
 
     // if (this.state.backend === "aiohttp") {
     //   this.openNewWebSocket()
@@ -135,16 +133,13 @@ class App extends React.Component {
     setTimeout(() => {this.openNewSocketIO()}, 5000);
   }
 
-  onMessage(event) {
-    let json = JSON.parse(event.data);
-    console.log(json);
-    let new_state = {
+  updateState(json) {
+    const new_state = {
       playlist: json.data,
       current_index: json.current_track,
       state: json.state === "TRANSITIONING" ? this.state.state: json.state
     }
-    let update = (new_state) => {this.setState(new_state)}
-    update(new_state)
+    this.setState(new_state)
   }
 
   sendCommand(command, args=[]) {
@@ -177,7 +172,6 @@ class App extends React.Component {
     const protocol = ((window.location.protocol==='https:'&&'wss://')||'ws://')
     return protocol + window.location.host + "/";
   }
-
 
   getServerPath() {
     if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
