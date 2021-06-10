@@ -58,33 +58,51 @@ function Footer(props) {
   )
 }
 
-// class WebSocketConnection {
-//   constructor() {
-//     this.websocket = new WebSocket(this.getWebSocketURI())
-//     console.log("Trying to open wedsocket")
-//     console.log(this.getWebSocketURI())
-//     const websocket = new WebSocket(this.getWebSocketURI());
-//     websocket.onmessage = (event) => {this.onMessage(event)};
-//     websocket.onopen = (event) => {console.log("socket opened")}
-//     websocket.onclose = (event) => {this.onWebSocketClose(event)};
-//   }
+class WebSocketConnection {
+  constructor(onMessage) {
+    // this.onMessage = (event) => {onMessage(event)}
+ 
+    console.log("Trying to open wedsocket")
+    console.log(this.getURI())
+    const websocket = new WebSocket(this.getURI());
+    websocket.onmessage = (event) => {onMessage(event)};
+    websocket.onopen = (event) => {console.log("socket opened")}
+    websocket.onclose = (event) => {this.onWebSocketClose(event)};
+    this.websocket = websocket
 
-//   getWebSocketURI() {
-//     if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
-//       return "ws://localhost:8080/bedroom"
-//     }
-//     const protocol = ((window.location.protocol==='https:'&&'wss://')||'ws://')
-//     return protocol + window.location.host + window.location.pathname;
-//   }
+    // this.sendCommand = this.sendCommand.bind(this)
+  }
 
-// }
+  getURI() {
+    if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
+      return "ws://localhost:8080/bedroom"
+    }
+    const protocol = ((window.location.protocol==='https:'&&'wss://')||'ws://')
+    return protocol + window.location.host + window.location.pathname;
+  }
+  
+  onWebSocketClose(event) {
+    console.log("socket closed")
+    setTimeout(() => {this.openNewWebSocket()}, 5000);
+  }
+
+  sendCommand(message) {
+    let send_message = (message) => {
+      this.websocket.send(JSON.stringify(message))
+    };
+    send_message(message)
+    // this.websocket.send(JSON.stringify(message));
+  }  
+}
 
 class App extends React.Component {
   constructor(props) {
     super(props)
+    this.onMessage = this.onMessage.bind(this);
+    this.websocket = null;
+    this.backend = "aiohttp";
+
     this.state = {
-      backend: "aiohttp",
-      websocket: null,
       playlist: [],
       current_index: null,
       state: null,
@@ -92,28 +110,13 @@ class App extends React.Component {
   };
 
   componentDidMount() {
-    if (this.state.backend === "aiohttp") {
-      this.openNewWebSocket()
-    } else if (this.state.backend === "flask") {
-      this.openNewSocketIO()
-    } 
-  }
+    this.websocket = new WebSocketConnection(this.onMessage);
 
-  openNewWebSocket() {
-    console.log("Trying to open wedsocket")
-    console.log(this.getWebSocketURI())
-    const websocket = new WebSocket(this.getWebSocketURI());
-    websocket.onmessage = (event) => {this.onMessage(event)};
-    websocket.onopen = (event) => {console.log("socket opened")}
-
-    websocket.onclose = (event) => {this.onWebSocketClose(event)};
-    this.setState({websocket: websocket});
-
-  }
-
-  onWebSocketClose(event) {
-    console.log("socket closed")
-    setTimeout(() => {this.openNewWebSocket()}, 5000);
+    // if (this.state.backend === "aiohttp") {
+    //   this.openNewWebSocket()
+    // } else if (this.state.backend === "flask") {
+    //   this.openNewSocketIO()
+    // } 
   }
 
   openNewSocketIO() {
@@ -132,29 +135,24 @@ class App extends React.Component {
     setTimeout(() => {this.openNewSocketIO()}, 5000);
   }
 
-
   onMessage(event) {
-    console.log(event)
     let json = JSON.parse(event.data);
     console.log(json);
-    this.setState({
+    let new_state = {
       playlist: json.data,
       current_index: json.current_track,
       state: json.state === "TRANSITIONING" ? this.state.state: json.state
-    });
+    }
+    let update = (new_state) => {this.setState(new_state)}
+    update(new_state)
   }
 
   sendCommand(command, args=[]) {
     let message = {
-        command: command,
-        args: args,
+      command: command,
+      args: args,
     }
-      if (this.state.backend === "aiohttp") {
-        this.state.websocket.send(JSON.stringify(message));
-      } else if (this.state.backend === "flask") {
-        console.log("sending message...", message);
-        this.state.websocket.emit("message" , message);
-      } 
+    this.websocket.sendCommand(message)
   }  
 
   play(increment, index=this.state.current_index) {
@@ -170,14 +168,6 @@ class App extends React.Component {
       this.sendCommand("play")
       this.setState({state: "PLAYING"})
     }
-  }
-
-  getWebSocketURI() {
-    if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
-      return "ws://localhost:8080/bedroom"
-    }
-    const protocol = ((window.location.protocol==='https:'&&'wss://')||'ws://')
-    return protocol + window.location.host + window.location.pathname;
   }
 
   getSocketIOURI() {
