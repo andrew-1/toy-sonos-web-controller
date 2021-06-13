@@ -118,6 +118,7 @@ class App extends React.Component {
   constructor(props) {
     super(props)
     this.websocket = null;
+    // TODO: pass something to the app to tell it which backend is being used
     this.backend = "aiohttp";
 
     this.state = {
@@ -128,26 +129,11 @@ class App extends React.Component {
   };
 
   componentDidMount() {
-    this.websocket = new WebSocketConnection(this);
-    // this.websocket = new SocketIOConnection(this);
-
-    // if (this.state.backend === "aiohttp") {
-    //   this.openNewWebSocket()
-    // } else if (this.state.backend === "flask") {
-    //   this.openNewSocketIO()
-    // } 
-  }
-
-  openNewSocketIO() {
-    console.log("Trying to open socketio")
-    console.log(this.getSocketIOURI())
-    const websocket = socketIOClient(this.getSocketIOURI());
-    websocket.on("message", (event) => {this.onMessage(event)});
-    websocket.on("connect", (event) => {console.log("socket opened")});
-
-    websocket.on('disconnect', (event) => {this.onSocketIOClose(event)});
-    this.setState({websocket: websocket});
-
+    if (this.backend === "aiohttp") {
+      this.websocket = new WebSocketConnection(this);
+    } else if (this.backend === "flask") {
+       this.websocket = new SocketIOConnection(this);
+    } 
   }
 
   updateState(json) {
@@ -181,8 +167,6 @@ class App extends React.Component {
       this.setState({state: "PLAYING"})
     }
   }
-
-
 
   getServerPath() {
     if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {

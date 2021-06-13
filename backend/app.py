@@ -1,4 +1,13 @@
-"""Very prelim backend using Flask, see server.py for the main backend"""
+"""Very prelim backend using Flask, see server.py for the main backend
+
+Currently doesn't send commands
+The async queue for sending messages seems to be getting blocked. 
+This most likely has something to do with how the threads and async
+are interacting
+
+To use this you also need to change the hardcoded backend property in 
+the react code
+"""
 
 from __future__ import annotations
 import asyncio
