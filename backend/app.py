@@ -1,3 +1,5 @@
+"""Very prelim backend using Flask, see server.py for the main backend"""
+
 from __future__ import annotations
 import asyncio
 import json
